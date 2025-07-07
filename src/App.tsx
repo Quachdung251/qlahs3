@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { Scale, FileText, LogOut, Users } from 'lucide-react';
 import TabNavigation from './components/TabNavigation';
@@ -16,29 +17,36 @@ import { useReports } from './hooks/useReports';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
 import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
-import { Prosecutor } from './data/prosecutors';
+// import { Prosecutor } from './data/prosecutors'; // XÓA BỎ DÒNG NÀY HOẶC COMMENT LẠI
+import { Prosecutor } from './api/prosecutors'; // <--- THÊM DÒNG NÀY: Import Prosecutor từ api/prosecutors
+import { useProsecutors } from './hooks/useProsecutors'; // <--- THÊM DÒNG NÀY: Import hook useProsecutors
 
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
-  const { user, loading, signIn, signOut, isAuthenticated } = useSupabaseAuth();
+  const { user, loading: authLoading, signIn, signOut, isAuthenticated } = useSupabaseAuth(); // Đổi tên 'loading' thành 'authLoading' để tránh trùng với prosecutorsLoading
   const { isInitialized } = useIndexedDB();
   const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
   const [activeTab, setActiveTab] = useState('add');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
-  
+
+  // <--- THÊM DÒNG NÀY: Sử dụng hook useProsecutors để lấy danh sách KSV
+  const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, setProsecutors } = useProsecutors();
+  // console.log("Prosecutors in App:", prosecutors); // Dùng để debug, có thể xóa sau
+
   const userKey = user?.id || 'default';
   const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading } = useCases(userKey, isInitialized);
   const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading } = useReports(userKey, isInitialized);
 
-  // Show loading while initializing
-  if (loading || !isInitialized) {
+  // Show loading while initializing or fetching prosecutors
+  // <--- THAY ĐỔI ĐIỀU KIỆN LOADING Ở ĐÂY
+  if (authLoading || !isInitialized || prosecutorsLoading) { // Thêm prosecutorsLoading vào điều kiện
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Scale className="text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-gray-600">Đang khởi tạo hệ thống...</p>
+          <p className="text-gray-600">Đang khởi tạo hệ thống và tải dữ liệu...</p> {/* Cập nhật thông báo */}
         </div>
       </div>
     );
@@ -61,29 +69,32 @@ const App: React.FC = () => {
     console.log('Updated criminal code data:', data);
   };
 
+  // <--- THAY ĐỔI HÀM NÀY: Cập nhật state prosecutors của App
   const handleUpdateProsecutors = (data: Prosecutor[]) => {
-    console.log('Updated prosecutors data:', data);
+    console.log('Updated prosecutors data in App:', data);
+    setProsecutors(data); // Cập nhật state prosecutors trong App.tsx
   };
 
   // Filter cases/reports based on search term and prosecutor
   const filterItems = (itemsToFilter: any[]) => {
     return itemsToFilter.filter(item => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.charges.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.defendants && item.defendants.some((d: any) => 
+        (item.defendants && item.defendants.some((d: any) =>
           d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           d.charges.toLowerCase().includes(searchTerm.toLowerCase())
         ));
-      
-      const matchesProsecutor = !selectedProsecutor || 
+
+      // So sánh với tên kiểm sát viên (item.prosecutor lưu tên KSV)
+      const matchesProsecutor = !selectedProsecutor ||
         item.prosecutor === selectedProsecutor;
-      
+
       return matchesSearch && matchesProsecutor;
     });
   };
 
-  // Case management columns
+  // Case management columns (giữ nguyên)
   const getCaseTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Vụ án' },
@@ -150,7 +161,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Report management columns
+  // Report management columns (giữ nguyên)
   const getReportTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Tin báo' },
@@ -192,7 +203,7 @@ const App: React.FC = () => {
 
   const getCaseTableData = () => {
     if (casesLoading) return [];
-    
+
     let data;
     switch (activeTab) {
       case 'all':
@@ -218,7 +229,7 @@ const App: React.FC = () => {
 
   const getReportTableData = () => {
     if (reportsLoading) return [];
-    
+
     let data;
     switch (activeTab) {
       case 'all':
@@ -242,14 +253,16 @@ const App: React.FC = () => {
     if (activeSystem === 'reports') {
       switch (activeTab) {
         case 'add':
-          return <ReportForm onAddReport={addReport} onTransferToCase={addCase} />;
+          // <--- TRUYỀN PROPS prosecutors VÀO ReportForm
+          return <ReportForm onAddReport={addReport} onTransferToCase={addCase} prosecutors={prosecutors} />;
         case 'statistics':
           return <ReportStatistics reports={reports} />;
         case 'data':
           return (
             <DataManagement
               onUpdateCriminalCode={handleUpdateCriminalCode}
-              onUpdateProsecutors={handleUpdateProsecutors}
+              onUpdateProsecutors={handleUpdateProsecutors} // <--- TRUYỀN HÀM NÀY ĐỂ DATAMANAGEMENT CÓ THỂ GỌI LÊN
+              currentUserId={user?.id || ''} // Truyền user id để DataManagement có thể sử dụng cho RLS
             />
           );
         default:
@@ -260,6 +273,7 @@ const App: React.FC = () => {
                 onSearchChange={setSearchTerm}
                 selectedProsecutor={selectedProsecutor}
                 onProsecutorChange={setSelectedProsecutor}
+                prosecutors={prosecutors} // <--- TRUYỀN PROPS prosecutors VÀO SearchFilter
               />
               <ReportTable
                 reports={getReportTableData()}
@@ -272,17 +286,19 @@ const App: React.FC = () => {
             </>
           );
       }
-    } else {
+    } else { // activeSystem === 'cases'
       switch (activeTab) {
         case 'add':
-          return <CaseForm onAddCase={addCase} />;
+          // <--- TRUYỀN PROPS prosecutors VÀO CaseForm
+          return <CaseForm onAddCase={addCase} prosecutors={prosecutors} />;
         case 'statistics':
           return <Statistics cases={cases} />;
         case 'data':
           return (
             <DataManagement
               onUpdateCriminalCode={handleUpdateCriminalCode}
-              onUpdateProsecutors={handleUpdateProsecutors}
+              onUpdateProsecutors={handleUpdateProsecutors} // <--- TRUYỀN HÀM NÀY ĐỂ DATAMANAGEMENT CÓ THỂ GỌI LÊN
+              currentUserId={user?.id || ''} // Truyền user id để DataManagement có thể sử dụng cho RLS
             />
           );
         default:
@@ -293,6 +309,7 @@ const App: React.FC = () => {
                 onSearchChange={setSearchTerm}
                 selectedProsecutor={selectedProsecutor}
                 onProsecutorChange={setSelectedProsecutor}
+                prosecutors={prosecutors} // <--- TRUYỀN PROPS prosecutors VÀO SearchFilter
               />
               <CaseTable
                 cases={getCaseTableData()}
@@ -319,7 +336,7 @@ const App: React.FC = () => {
                 <Scale className="text-blue-600" size={28} />
                 <h1 className="text-2xl font-bold text-gray-900">Hệ Thống Quản Lý</h1>
               </div>
-              
+
               {/* System Selector */}
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
@@ -346,19 +363,19 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-500">
-                {activeSystem === 'cases' 
+                {activeSystem === 'cases'
                   ? `Tổng số vụ án: ${cases.length}`
                   : `Tổng số tin báo: ${reports.length}`
                 }
               </div>
-              
+
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
-              
+
               <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -372,9 +389,9 @@ const App: React.FC = () => {
       </header>
 
       {/* Navigation */}
-      <TabNavigation 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
+      <TabNavigation
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         expiringSoonCount={expiringSoonCount}
         systemType={activeSystem}
       />
