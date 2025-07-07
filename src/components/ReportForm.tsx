@@ -5,14 +5,16 @@ import { getCurrentDate, addDaysToDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
-import { prosecutorsData } from '../data/prosecutors';
+// import { prosecutorsData } from '../data/prosecutors'; // XÓA DÒNG NÀY HOẶC COMMENT LẠI
+import { Prosecutor } from '../api/prosecutors'; // <--- THÊM DÒNG NÀY: Import Prosecutor interface từ api/prosecutors
 
 interface ReportFormProps {
   onAddReport: (reportData: ReportFormData) => void;
   onTransferToCase: (caseData: CaseFormData) => void;
+  prosecutors: Prosecutor[]; // <--- THÊM PROP NÀY
 }
 
-const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }) => {
+const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase, prosecutors }) => { // Nhận prop prosecutors
   const [formData, setFormData] = useState<ReportFormData>({
     name: '',
     charges: '',
@@ -23,6 +25,11 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Thêm kiểm tra cho các trường bắt buộc, bao gồm prosecutor
+    if (!formData.name.trim() || !formData.charges.trim() || !formData.resolutionDeadline.trim() || !formData.prosecutor.trim()) {
+      alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Tin Báo, Tội danh, Ngày Hết Hạn Giải Quyết, và Kiểm sát viên Phụ Trách.');
+      return;
+    }
     onAddReport(formData);
     setFormData({
       name: '',
@@ -34,6 +41,12 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
   };
 
   const handleProsecute = () => {
+    // Thêm kiểm tra cho các trường bắt buộc trước khi khởi tố
+    if (!formData.name.trim() || !formData.charges.trim() || !formData.prosecutor.trim()) {
+      alert('Vui lòng điền đầy đủ Tên Tin Báo, Tội danh, và Kiểm sát viên Phụ Trách trước khi khởi tố.');
+      return;
+    }
+
     // Convert report to case
     const caseData: CaseFormData = {
       name: formData.name,
@@ -65,7 +78,8 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
     description: item.description
   }));
 
-  const prosecutorOptions = prosecutorsData.map(prosecutor => ({
+  // <--- THAY ĐỔI DÒNG NÀY: Sử dụng props.prosecutors thay vì prosecutorsData
+  const prosecutorOptions = prosecutors.map(prosecutor => ({
     value: prosecutor.name,
     label: prosecutor.name,
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
@@ -126,7 +140,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
             <AutocompleteInput
               value={formData.prosecutor}
               onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions}
+              options={prosecutorOptions} // Sử dụng prosecutorOptions đã được tạo từ props.prosecutors
               placeholder="Nhập hoặc chọn kiểm sát viên"
               required
               icon={<User size={16} />}
@@ -153,7 +167,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ onAddReport, onTransferToCase }
             type="button"
             onClick={handleProsecute}
             className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors font-medium"
-            disabled={!formData.name || !formData.charges || !formData.prosecutor}
+            disabled={!formData.name.trim() || !formData.charges.trim() || !formData.prosecutor.trim()}
           >
             Khởi Tố Ngay
           </button>
