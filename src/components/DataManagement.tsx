@@ -13,8 +13,8 @@ import { useIndexedDB } from '../hooks/useIndexedDB';
 import {
   fetchProsecutors,
   addProsecutor,
-  updateProsecutor, // Đã thêm
-  deleteProsecutor, // Đã thêm
+  updateProsecutor,
+  deleteProsecutor,
   Prosecutor
 } from '../api/prosecutors';
 
@@ -26,9 +26,10 @@ interface DataManagementProps {
   // về sự thay đổi của dữ liệu, nếu cần re-render hoặc cập nhật ở nơi khác.
   onUpdateCriminalCode: (data: CriminalCodeItem[]) => void;
   onUpdateProsecutors: (data: Prosecutor[]) => void;
+  currentUserId: string; // <--- THÊM PROP NÀY: ID của người dùng hiện tại
 }
 
-const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, onUpdateProsecutors }) => {
+const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, onUpdateProsecutors, currentUserId }) => { // Nhận prop currentUserId
   const { user, loading: authLoading } = useSupabaseAuth(); // Lấy thông tin user Supabase
   const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors' | 'backup'>('criminal');
   const [criminalData, setCriminalData] = useState<CriminalCodeItem[]>(criminalCodeData);
@@ -76,19 +77,19 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
       // Chỉ tải dữ liệu nếu người dùng đã được xác định và không còn trong trạng thái loading của auth
       if (!authLoading) {
         setProsecutorLoading(true); // Bắt đầu loading
-        if (user) {
+        if (user && currentUserId) { // <--- THÊM KIỂM TRA currentUserId
           const data = await fetchProsecutors(); // RLS sẽ tự động lọc dữ liệu của user hiện tại
           setProsecutorData(data);
         } else {
-          // Nếu không có người dùng đăng nhập, xóa dữ liệu Kiểm sát viên hiện có
+          // Nếu không có người dùng đăng nhập hoặc currentUserId không có, xóa dữ liệu Kiểm sát viên hiện có
           setProsecutorData([]);
-          console.log("No user logged in, cannot fetch prosecutors data from Supabase.");
+          console.log("No user logged in or currentUserId is missing, cannot fetch prosecutors data from Supabase.");
         }
         setProsecutorLoading(false); // Kết thúc loading
       }
     };
     loadProsecutorsFromSupabase();
-  }, [user, authLoading]); // Dependency array: Re-run khi user hoặc authLoading thay đổi
+  }, [user, authLoading, currentUserId]); // <--- THÊM currentUserId VÀO DEPENDENCY ARRAY
 
   // Bulk Import for Criminal Code (vẫn giữ nguyên logic IndexedDB)
   const processBulkImport = () => {
@@ -161,7 +162,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
 
   // Prosecutor Management (Đã thay đổi để sử dụng Supabase)
   const handleAddProsecutor = () => {
-    if (!user) {
+    if (!user || !currentUserId) { // <--- THÊM KIỂM TRA currentUserId
       alert('Vui lòng đăng nhập để thêm Kiểm sát viên.');
       return;
     }
@@ -170,14 +171,15 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
   };
 
   const saveOrUpdateProsecutor = async (item: Prosecutor, isNew: boolean = false) => {
-    if (!user) {
+    if (!user || !currentUserId) { // <--- THÊM KIỂM TRA currentUserId
       alert('Bạn cần đăng nhập để thực hiện thao tác này.');
       return;
     }
 
     if (isNew) {
-      const { success, error } = await addProsecutor(item);
-      if (success) {
+      // <--- TRUYỀN currentUserId VÀO addProsecutor
+      const addedProsecutor = await addProsecutor(item, currentUserId);
+      if (addedProsecutor) {
         alert('Thêm Kiểm sát viên thành công!');
         setNewItem(null); // Đóng form thêm mới
         setEditingId(null); // Đảm bảo không có item nào đang được chỉnh sửa
@@ -185,7 +187,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         setProsecutorData(updatedData);
         onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
       } else {
-        alert('Lỗi khi thêm Kiểm sát viên: ' + error?.message);
+        alert('Lỗi khi thêm Kiểm sát viên.'); // Thông báo lỗi chung, chi tiết hơn đã có trong console
       }
     } else {
       // Logic cho việc UPDATE
@@ -194,33 +196,36 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
           alert('Không tìm thấy ID Kiểm sát viên để cập nhật.');
           return;
       }
-      const { success, error } = await updateProsecutor(item.id, { name: item.name, title: item.title, department: item.department });
-      if (success) {
+      // <--- TRUYỀN currentUserId VÀO updateProsecutor
+      const updatedProsecutor = await updateProsecutor(item.id, { name: item.name, title: item.title, department: item.department }, currentUserId);
+      if (updatedProsecutor) {
         alert('Cập nhật Kiểm sát viên thành công!');
         setEditingId(null);
         const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
         setProsecutorData(updatedData);
         onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
       } else {
-        alert('Lỗi khi cập nhật Kiểm sát viên: ' + error?.message);
+        alert('Lỗi khi cập nhật Kiểm sát viên.'); // Thông báo lỗi chung
       }
     }
   };
 
   const handleDeleteProsecutor = async (id: string) => {
-    if (!user) {
+    if (!user || !currentUserId) { // <--- THÊM KIỂM TRA currentUserId
       alert('Bạn cần đăng nhập để thực hiện thao tác này.');
       return;
     }
+    // Thay vì window.confirm, sử dụng modal tùy chỉnh nếu có
     if (window.confirm('Bạn có chắc chắn muốn xóa Kiểm sát viên này?')) {
-      const { success, error } = await deleteProsecutor(id);
+      // <--- TRUYỀN currentUserId VÀO deleteProsecutor
+      const success = await deleteProsecutor(id, currentUserId);
       if (success) {
         alert('Xóa Kiểm sát viên thành công!');
         const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
         setProsecutorData(updatedData);
         onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
       } else {
-        alert('Lỗi khi xóa Kiểm sát viên: ' + error?.message);
+        alert('Lỗi khi xóa Kiểm sát viên.'); // Thông báo lỗi chung
       }
     }
   };
