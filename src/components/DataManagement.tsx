@@ -334,10 +334,8 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
             className="w-full p-2 border rounded"
           >
             <option value="">Chọn phòng ban</option>
-            <option value="Ban Lãnh đạo">Ban Lãnh đạo</option>
-            <option value="Phòng Điều tra">Phòng Điều tra</option>
-            <option value="Phòng Truy tố">Phòng Truy tố</option>
-            <option value="Phòng Xét xử">Phòng Xét xử</option>
+            <option value="Phòng Hình sự">Phòng Hình sự</option>
+            <option value="Phòng Dân sự">Phòng Dân sự</option>
             <option value="Văn phòng">Văn phòng</option>
           </select>
         </td>
