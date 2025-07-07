@@ -1,3 +1,4 @@
+// src/components/CaseForm.tsx
 import React, { useState } from 'react';
 import { Plus, Minus, User, FileText, Shield, Clock } from 'lucide-react';
 import { CaseFormData, Defendant } from '../types';
@@ -5,13 +6,15 @@ import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
-import { prosecutorsData } from '../data/prosecutors';
+// import { prosecutorsData } from '../data/prosecutors'; // XÓA DÒNG NÀY HOẶC COMMENT LẠI
+import { Prosecutor } from '../api/prosecutors'; // <--- THÊM DÒNG NÀY: Import Prosecutor interface từ api/prosecutors
 
 interface CaseFormProps {
   onAddCase: (caseData: CaseFormData) => void;
+  prosecutors: Prosecutor[]; // <--- THÊM PROP NÀY
 }
 
-const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
+const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // Nhận prop prosecutors
   const [formData, setFormData] = useState<CaseFormData>({
     name: '',
     charges: '',
@@ -35,6 +38,12 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
     // Auto-set case charges from first defendant if empty
     if (!formData.charges.trim() && formData.defendants.length > 0 && formData.defendants[0].charges.trim()) {
       finalCaseData.charges = formData.defendants[0].charges;
+    }
+
+    // Thêm kiểm tra cho selectedProsecutor (formData.prosecutor)
+    if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
+      alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách.');
+      return;
     }
     
     onAddCase(finalCaseData);
@@ -88,7 +97,8 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
     description: item.description
   }));
 
-  const prosecutorOptions = prosecutorsData.map(prosecutor => ({
+  // <--- THAY ĐỔI DÒNG NÀY: Sử dụng props.prosecutors thay vì prosecutorsData
+  const prosecutorOptions = prosecutors.map(prosecutor => ({
     value: prosecutor.name,
     label: prosecutor.name,
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
@@ -148,7 +158,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase }) => {
             <AutocompleteInput
               value={formData.prosecutor}
               onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions}
+              options={prosecutorOptions} // Sử dụng prosecutorOptions đã được tạo từ props.prosecutors
               placeholder="Nhập hoặc chọn kiểm sát viên"
               required
               icon={<User size={16} />}
