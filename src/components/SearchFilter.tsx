@@ -1,19 +1,22 @@
 import React from 'react';
 import { Search, Filter } from 'lucide-react';
-import { prosecutorsData } from '../data/prosecutors';
+// import { prosecutorsData } from '../data/prosecutors'; // XÓA DÒNG NÀY HOẶC COMMENT LẠI
+import { Prosecutor } from '../api/prosecutors'; // <--- THÊM DÒNG NÀY: Import Prosecutor interface từ api/prosecutors
 
 interface SearchFilterProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   selectedProsecutor: string;
   onProsecutorChange: (value: string) => void;
+  prosecutors: Prosecutor[]; // <--- THÊM PROP NÀY
 }
 
 const SearchFilter: React.FC<SearchFilterProps> = ({
   searchTerm,
   onSearchChange,
   selectedProsecutor,
-  onProsecutorChange
+  onProsecutorChange,
+  prosecutors // Nhận prop prosecutors
 }) => {
   return (
     <div className="bg-gray-50 p-4 rounded-lg mb-6">
@@ -45,7 +48,8 @@ const SearchFilter: React.FC<SearchFilterProps> = ({
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Tất cả Kiểm sát viên</option>
-            {prosecutorsData.map((prosecutor) => (
+            {/* <--- THAY ĐỔI DÒNG NÀY: Sử dụng props.prosecutors thay vì prosecutorsData */}
+            {prosecutors.map((prosecutor) => (
               <option key={prosecutor.id} value={prosecutor.name}>
                 {prosecutor.name} - {prosecutor.title}
               </option>
