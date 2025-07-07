@@ -212,7 +212,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
 
   const handleDeleteProsecutor = async (id: string) => {
     if (!user || !currentUserId) { // <--- THÊM KIỂM TRA currentUserId
-      alert('Bạn cần đăng nhập để thực hiện thao tác này.');
+      alert('Vui lòng đăng nhập để thực hiện thao tác này.');
       return;
     }
     // Thay vì window.confirm, sử dụng modal tùy chỉnh nếu có
@@ -321,10 +321,10 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             className="w-full p-2 border rounded"
           >
-            <option value="Kiểm sát viên">Kiểm sát viên</option>
-            <option value="Kiểm sát viên chính">Kiểm sát viên chính</option>
-            <option value="Phó Viện trưởng">Phó Viện trưởng</option>
-            <option value="Viện trưởng">Viện trưởng</option>
+            <option value="Kiểm sát viên sơ cấp">Kiểm sát viên sơ cấp</option>
+            <option value="Kiểm sát viên trung cấp">Kiểm sát viên trung cấp</option>
+            <option value="Kiểm tra viên">Kiểm tra viên</option>
+            <option value="Cán bộ">Cán bộ</option>
           </select>
         </td>
         <td className="px-4 py-2">
