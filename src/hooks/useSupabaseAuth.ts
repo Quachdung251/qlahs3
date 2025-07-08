@@ -26,7 +26,7 @@ export const useSupabaseAuth = () => {
 
     // Cleanup listener
     return () => {
-      authListener.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
