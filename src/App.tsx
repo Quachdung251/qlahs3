@@ -387,7 +387,8 @@ const App: React.FC = () => {
                     break;
                 case 'defendantsList': // <--- THAY ĐỔI: Xử lý cột Bị can
                     if (caseItem.defendants && caseItem.defendants.length > 0) {
-                        row[col.key] = caseItem.defendants.map(d => d.name).join('; ');
+                        // Định dạng tên bị can: Bị can 1; Bị can 2; ...
+                        row[col.key] = caseItem.defendants.map((d, idx) => `Bị can ${idx + 1}: ${d.name}`).join('; ');
                     } else {
                         row[col.key] = 'Không có bị can';
                     }
@@ -926,4 +927,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-```
