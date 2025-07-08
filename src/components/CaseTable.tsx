@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
-import CaseEditModal from './CaseEditModal';
+// import CaseEditModal from './CaseEditModal'; // XÓA DÒNG NÀY: Modal chỉnh sửa sẽ được quản lý ở App.tsx
 import NotesModal from './NotesModal';
 import ExtensionModal from './ExtensionModal';
 
@@ -16,6 +16,7 @@ interface CaseTableProps {
   onDeleteCase: (caseId: string) => void;
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onUpdateCase: (updatedCase: Case) => void;
+  onEditCase: (caseItem: Case) => void; // <--- THÊM PROP NÀY: Hàm xử lý khi nhấn Sửa
   showWarnings?: boolean;
 }
 
@@ -25,11 +26,12 @@ const CaseTable: React.FC<CaseTableProps> = ({
   onDeleteCase, 
   onTransferStage,
   onUpdateCase,
+  onEditCase, // <--- NHẬN PROP MỚI
   showWarnings = false 
 }) => {
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [editingCase, setEditingCase] = useState<Case | null>(null);
+  // const [editingCase, setEditingCase] = useState<Case | null>(null); // XÓA DÒNG NÀY: State này sẽ được quản lý ở App.tsx
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
   const [notesCase, setNotesCase] = useState<Case | null>(null);
   const [extensionModal, setExtensionModal] = useState<{
@@ -57,70 +59,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
     }
     setExpandedActions(newExpanded);
   };
-
-  // HÀM exportToExcel CŨ ĐÃ ĐƯỢC CHUYỂN LÊN App.tsx VÀ utils/excelExportUtils.ts
-  // const exportToExcel = () => {
-  //   if (cases.length === 0) {
-  //     alert('Không có dữ liệu để xuất');
-  //     return;
-  //   }
-
-  //   const headers = columns.filter(col => col.key !== 'actions').map(col => col.label);
-  //   const csvRows = cases.map(caseItem => {
-  //     return columns.filter(col => col.key !== 'actions').map(col => {
-  //       let value = '';
-  //       switch (col.key) {
-  //         case 'totalDefendants':
-  //           value = caseItem.defendants.length.toString();
-  //           break;
-  //         case 'shortestDetention':
-  //           const detainedDefendants = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-  //           if (detainedDefendants.length === 0) {
-  //             value = 'Không có';
-  //           } else {
-  //             const shortestDays = Math.min(...detainedDefendants.map(d => getDaysRemaining(d.detentionDeadline!)));
-  //             value = `${shortestDays} ngày`;
-  //           }
-  //           break;
-  //         case 'investigationRemaining':
-  //           value = `${getDaysRemaining(caseItem.investigationDeadline)} ngày`;
-  //           break;
-  //         case 'shortestDetentionRemaining':
-  //           const detainedDefs = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-  //           if (detainedDefs.length === 0) {
-  //             value = 'Không có';
-  //           } else {
-  //             const shortestDetentionDays = Math.min(...detainedDefs.map(d => getDaysRemaining(d.detentionDeadline!)));
-  //             value = `${shortestDetentionDays} ngày`;
-  //           }
-  //           break;
-  //         case 'notes':
-  //           value = caseItem.notes || '';
-  //           break;
-  //         default:
-  //           const cellValue = caseItem[col.key as keyof Case];
-  //           value = cellValue ? cellValue.toString() : '';
-  //       }
-  //       return value;
-  //     });
-  //   });
-
-  //   const csvContent = [
-  //     headers.join('\t'), 
-  //     ...csvRows.map(row => row.join('\t'))
-  //   ].join('\n');
-
-  //   const BOM = '\uFEFF';
-  //   const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
-  //   const link = document.createElement('a');
-  //   const url = URL.createObjectURL(blob);
-  //   link.setAttribute('href', url);
-  //   link.setAttribute('download', `danh-sach-vu-an-${new Date().toISOString().split('T')[0]}.txt`);
-  //   link.style.visibility = 'hidden';
-  //   document.body.appendChild(link);
-  //   link.click();
-  //   document.body.removeChild(link);
-  // };
 
   const getStageActions = (caseItem: Case) => {
     const actions = [];
@@ -266,9 +204,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return (
           <div className="relative">
             <div className="flex items-center gap-1">
-              {/* Always show Edit button */}
+              {/* Always show Edit button, now calling onEditCase prop */}
               <button
-                onClick={() => setEditingCase(caseItem)}
+                onClick={() => onEditCase(caseItem)} // <--- THAY ĐỔI: Gọi onEditCase prop
                 className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
               >
                 <Edit2 size={12} />
@@ -342,19 +280,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      {/* Nút Xuất Excel đã được di chuyển lên App.tsx, loại bỏ khỏi đây */}
-      {/* {cases.length > 0 && (
-        <div className="p-4 border-b border-gray-200">
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-          >
-            <Download size={16} />
-            Xuất Excel
-          </button>
-        </div>
-      )} */}
-
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
@@ -400,7 +325,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       <div className="space-y-2">
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
-                          <div key={index} className="bg-white p-3 rounded border">
+                          <div key={defendant.id || index} className="bg-white p-3 rounded border">
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
                               <div>
                                 <span className="font-medium">Tên:</span> {defendant.name}
@@ -445,15 +370,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         <div className="text-center py-8 text-gray-500">
           Không có vụ án nào
         </div>
-      )}
-
-      {/* Edit Modal */}
-      {editingCase && (
-        <CaseEditModal
-          case={editingCase}
-          onSave={onUpdateCase}
-          onClose={() => setEditingCase(null)}
-        />
       )}
 
       {/* Notes Modal */}
