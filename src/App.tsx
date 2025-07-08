@@ -18,7 +18,8 @@ import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './api/prosecutors';
 import { useProsecutors } from './hooks/useProsecutors';
-import { exportToExcel } from './utils/excelExportUtils'; // <--- THÊM DÒNG NÀY: Import hàm exportToExcel
+// <--- THAY ĐỔI DÒNG NÀY: Import cả prepareCaseDataForExcel và prepareReportDataForExcel
+import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel } from './utils/excelExportUtils'; 
 import { CaseFormData } from './types'; // Import CaseFormData để có type cho cases
 
 type SystemType = 'cases' | 'reports';
@@ -246,86 +247,19 @@ const App: React.FC = () => {
 
   // Xử lý xuất Excel cho vụ án với nhiều bị can
   const handleExportCasesToExcel = () => {
-    const dataToExport: any[] = [];
-    const columns = [
-      { key: 'caseName', label: 'Tên Vụ án' },
-      { key: 'stage', label: 'Giai đoạn' },
-      { key: 'investigationRemaining', label: 'Thời hạn ĐT còn lại' },
-      { key: 'prosecutor', label: 'KSV' },
-      { key: 'defendantName', label: 'Tên Bị can' },
-      { key: 'defendantCharges', label: 'Tội danh Bị can' },
-      { key: 'preventiveMeasure', label: 'Biện pháp Ngăn chặn' },
-      { key: 'detentionDeadline', label: 'Thời hạn Tạm giam' },
-      { key: 'caseNotes', label: 'Ghi chú Vụ án' }, // <--- DI CHUYỂN CỘT GHI CHÚ XUỐNG CUỐI CÙNG
-    ];
-
-    getCaseTableData().forEach((caseItem: CaseFormData) => {
-      if (caseItem.defendants && caseItem.defendants.length > 0) {
-        caseItem.defendants.forEach((defendant, index) => {
-          const row: any = {};
-          // Chỉ điền thông tin vụ án cho dòng đầu tiên của mỗi vụ
-          if (index === 0) {
-            row.caseName = caseItem.name;
-            row.stage = caseItem.stage;
-            row.investigationRemaining = caseItem.investigationDeadline; // Cần tính toán lại nếu muốn hiển thị "còn lại"
-            row.prosecutor = caseItem.prosecutor;
-            row.caseNotes = caseItem.notes;
-          } else {
-            // Để trống các cột vụ án cho các bị can tiếp theo
-            row.caseName = '';
-            row.stage = '';
-            row.investigationRemaining = '';
-            row.prosecutor = '';
-            row.caseNotes = '';
-          }
-
-          // Điền thông tin bị can
-          row.defendantName = defendant.name;
-          row.defendantCharges = defendant.charges;
-          row.preventiveMeasure = defendant.preventiveMeasure;
-          row.detentionDeadline = defendant.detentionDeadline || ''; // Chỉ có nếu là tạm giam
-
-          dataToExport.push(row);
-        });
-      } else {
-        // Xử lý trường hợp vụ án không có bị can nào (nếu có)
-        dataToExport.push({
-          caseName: caseItem.name,
-          stage: caseItem.stage,
-          investigationRemaining: caseItem.investigationDeadline,
-          prosecutor: caseItem.prosecutor,
-          caseNotes: caseItem.notes,
-          defendantName: 'Không có bị can',
-          defendantCharges: '',
-          preventiveMeasure: '',
-          detentionDeadline: ''
-        });
-      }
-    });
-
+    // Lấy dữ liệu đã được lọc từ getCaseTableData()
+    const filteredCases = getCaseTableData(); 
+    // Sử dụng hàm prepareCaseDataForExcel để chuẩn bị dữ liệu và cột
+    const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases);
     exportToExcel(dataToExport, columns, 'BaoCaoVuAn');
   };
 
   // Xử lý xuất Excel cho tin báo
   const handleExportReportsToExcel = () => {
-    const dataToExport = getReportTableData().map(report => ({
-      'Tên Tin báo': report.name,
-      'Tội danh': report.charges,
-      'Hạn giải quyết': report.resolutionDeadline,
-      'KSV': report.prosecutor,
-      'Ghi chú': report.notes,
-      'Trạng thái': report.stage,
-    }));
-
-    const columns = [
-      { key: 'Tên Tin báo', label: 'Tên Tin báo' },
-      { key: 'Tội danh', label: 'Tội danh' },
-      { key: 'Hạn giải quyết', label: 'Hạn giải quyết' },
-      { key: 'KSV', label: 'KSV' },
-      { key: 'Ghi chú', label: 'Ghi chú' },
-      { key: 'Trạng thái', label: 'Trạng thái' },
-    ];
-
+    // Lấy dữ liệu đã được lọc từ getReportTableData()
+    const filteredReports = getReportTableData();
+    // Sử dụng hàm prepareReportDataForExcel để chuẩn bị dữ liệu và cột
+    const { data: dataToExport, columns } = prepareReportDataForExcel(filteredReports);
     exportToExcel(dataToExport, columns, 'BaoCaoTinBao');
   };
 
