@@ -17,7 +17,7 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
         setCases(savedCases);
       } catch (error) {
         console.error('Failed to load cases:', error);
-        // Fallback to localStorage
+        // Fallback to localStorage (consider removing localStorage fallback if IndexedDB is primary)
         const fallbackCases = localStorage.getItem(`legalCases_${userKey}`);
         if (fallbackCases) {
           setCases(JSON.parse(fallbackCases));
@@ -32,12 +32,13 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
 
   // Save cases to IndexedDB whenever cases change
   useEffect(() => {
-    if (!isDBInitialized || isLoading || cases.length < 0) return;
+    // Chỉ lưu khi DB đã khởi tạo và không trong trạng thái loading ban đầu
+    if (!isDBInitialized || isLoading) return; 
 
     const saveCases = async () => {
       try {
         await dbManager.saveData('cases', cases);
-        // Also save to localStorage as backup
+        // Also save to localStorage as backup (consider removing localStorage fallback if IndexedDB is primary)
         localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
       } catch (error) {
         console.error('Failed to save cases:', error);
@@ -46,17 +47,22 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
       }
     };
 
-    saveCases();
+    // Delay saving slightly to avoid too frequent writes if state changes rapidly
+    const handler = setTimeout(() => {
+      saveCases();
+    }, 500); // Save after 500ms of inactivity
+
+    return () => clearTimeout(handler); // Cleanup timeout on unmount or re-render
   }, [cases, userKey, isLoading, isDBInitialized]);
 
   const addCase = (caseData: CaseFormData) => {
     const newCase: Case = {
-      id: Date.now().toString(),
+      id: Date.now().toString(), // Đảm bảo ID là duy nhất
       ...caseData,
       stage: 'Điều tra',
       defendants: caseData.defendants.map(defendant => ({
         ...defendant,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9) // ID duy nhất cho bị can
       })),
       createdAt: getCurrentDate()
     };
@@ -116,6 +122,33 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     });
   };
 
+  /**
+   * Ghi đè toàn bộ dữ liệu vụ án trong IndexedDB và state.
+   * Được sử dụng khi khôi phục dữ liệu từ Supabase.
+   * @param newCases Mảng các vụ án mới để ghi đè.
+   */
+  const overwriteAllCases = async (newCases: Case[]) => {
+    if (!isDBInitialized) {
+      console.warn('IndexedDB chưa được khởi tạo, không thể ghi đè dữ liệu vụ án.');
+      return;
+    }
+    setIsLoading(true); // Đặt loading để tránh lưu tự động trong quá trình ghi đè
+    try {
+      await dbManager.clear('cases'); // Xóa tất cả dữ liệu cũ trong IndexedDB
+      // Thêm từng vụ án mới vào IndexedDB
+      for (const caseItem of newCases) {
+        await dbManager.add('cases', caseItem); 
+      }
+      setCases(newCases); // Cập nhật state React
+      localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(newCases)); // Cập nhật localStorage
+      console.log('Đã ghi đè tất cả vụ án từ backup thành công.');
+    } catch (error) {
+      console.error('Lỗi khi ghi đè vụ án từ backup:', error);
+    } finally {
+      setIsLoading(false); // Kết thúc loading
+    }
+  };
+
   return {
     cases,
     addCase,
@@ -124,6 +157,7 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     transferStage,
     getCasesByStage,
     getExpiringSoonCases,
-    isLoading
+    isLoading,
+    overwriteAllCases, // <--- ĐÃ THÊM: Trả về hàm ghi đè
   };
 };
