@@ -67,10 +67,8 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       // Nếu danh sách chưa mở, nhấn ArrowDown hoặc Enter sẽ mở danh sách
       if (e.key === 'ArrowDown' || e.key === 'Enter') {
         setIsOpen(true);
-        // Khi mở, nếu input rỗng, hiển thị tất cả options
-        if (!value.trim()) {
-          setFilteredOptions(options);
-        }
+        // Khi mở, luôn hiển thị tất cả options
+        setFilteredOptions(options); // <--- THAY ĐỔI Ở ĐÂY
         return;
       }
     }
@@ -111,11 +109,8 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
 
   const handleFocus = () => {
     setIsOpen(true); // Mở danh sách khi input được focus
-    // Khi focus, hiển thị tất cả các tùy chọn ban đầu nếu input rỗng,
-    // hoặc giữ nguyên các tùy chọn đã lọc nếu có giá trị
-    if (!value.trim()) {
-      setFilteredOptions(options);
-    }
+    // Khi focus, luôn hiển thị tất cả các tùy chọn ban đầu
+    setFilteredOptions(options); // <--- THAY ĐỔI Ở ĐÂY
   };
 
   const handleBlur = (e: React.FocusEvent) => {
