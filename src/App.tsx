@@ -19,7 +19,7 @@ import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './api/prosecutors';
 import { useProsecutors } from './hooks/useProsecutors';
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
-import { CaseFormData } from './types'; // Import CaseFormData để có type cho cases
+import { Case, Report, CaseFormData } from './types'; // Import Case và Report types
 import { getCurrentDate } from './utils/dateUtils'; // Import getCurrentDate
 
 type SystemType = 'cases' | 'reports';
@@ -35,6 +35,10 @@ const App: React.FC = () => {
   // Thêm state cho ngày bắt đầu và ngày kết thúc thống kê
   const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
   const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
+
+  // Thêm state để quản lý vụ án/tin báo đang được chỉnh sửa
+  const [editingCase, setEditingCase] = useState<Case | null>(null);
+  const [editingReport, setEditingReport] = useState<Report | null>(null);
 
   const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, setProsecutors } = useProsecutors();
 
@@ -74,6 +78,8 @@ const App: React.FC = () => {
     setActiveTab('add');
     setSearchTerm('');
     setSelectedProsecutor('');
+    setEditingCase(null); // Clear editing state when switching systems
+    setEditingReport(null); // Clear editing state when switching systems
     // Reset ngày thống kê khi chuyển hệ thống
     setStatisticsFromDate(getCurrentDate());
     setStatisticsToDate(getCurrentDate());
@@ -86,6 +92,42 @@ const App: React.FC = () => {
   const handleUpdateProsecutors = (data: Prosecutor[]) => {
     console.log('Updated prosecutors data in App:', data);
     setProsecutors(data);
+  };
+
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
+  const handleEditCase = (caseToEdit: Case) => {
+    setEditingCase(caseToEdit);
+    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
+  };
+
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một tin báo
+  const handleEditReport = (reportToEdit: Report) => {
+    setEditingReport(reportToEdit);
+    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setActiveSystem('reports'); // Đảm bảo hệ thống tin báo đang hoạt động
+  };
+
+  // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
+  const handleCaseFormSubmit = (caseData: CaseFormData, isEditing: boolean) => {
+    if (isEditing && editingCase) {
+      updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt });
+      setEditingCase(null); // Xóa trạng thái chỉnh sửa
+      setActiveTab('all'); // Chuyển về tab danh sách
+    } else {
+      addCase(caseData);
+    }
+  };
+
+  // Hàm xử lý khi form chỉnh sửa tin báo hoàn tất (lưu hoặc hủy)
+  const handleReportFormSubmit = (reportData: ReportFormData, isEditing: boolean) => {
+    if (isEditing && editingReport) {
+      updateReport({ ...reportData, id: editingReport.id, stage: editingReport.stage, createdAt: editingReport.createdAt });
+      setEditingReport(null); // Xóa trạng thái chỉnh sửa
+      setActiveTab('all'); // Chuyển về tab danh sách
+    } else {
+      addReport(reportData);
+    }
   };
 
   // Filter cases/reports based on search term and prosecutor
@@ -416,7 +458,19 @@ const App: React.FC = () => {
     if (activeSystem === 'reports') {
       switch (activeTab) {
         case 'add':
-          return <ReportForm onAddReport={addReport} onTransferToCase={addCase} prosecutors={prosecutors} />;
+          return (
+            <ReportForm 
+              onAddReport={(data) => handleReportFormSubmit(data, false)} // Khi thêm mới
+              onUpdateReport={(data) => handleReportFormSubmit(data, true)} // Khi cập nhật
+              onTransferToCase={addCase} 
+              prosecutors={prosecutors} 
+              initialData={editingReport} // Truyền dữ liệu tin báo đang chỉnh sửa
+              onCancelEdit={() => { // Hàm hủy chỉnh sửa
+                setEditingReport(null);
+                setActiveTab('all'); // Chuyển về tab danh sách
+              }}
+            />
+          );
         case 'statistics':
           return (
             <>
@@ -472,6 +526,7 @@ const App: React.FC = () => {
                 onTransferStage={transferReportStage}
                 onUpdateReport={updateReport}
                 onTransferToCase={addCase}
+                onEditReport={handleEditReport} // Truyền hàm xử lý chỉnh sửa
               />
             </>
           );
@@ -479,7 +534,18 @@ const App: React.FC = () => {
     } else { // activeSystem === 'cases'
       switch (activeTab) {
         case 'add':
-          return <CaseForm onAddCase={addCase} prosecutors={prosecutors} />;
+          return (
+            <CaseForm 
+              onAddCase={(data) => handleCaseFormSubmit(data, false)} // Khi thêm mới
+              onUpdateCase={(data) => handleCaseFormSubmit(data, true)} // Khi cập nhật
+              prosecutors={prosecutors} 
+              initialData={editingCase} // Truyền dữ liệu vụ án đang chỉnh sửa
+              onCancelEdit={() => { // Hàm hủy chỉnh sửa
+                setEditingCase(null);
+                setActiveTab('all'); // Chuyển về tab danh sách
+              }}
+            />
+          );
         case 'statistics':
           return (
             <>
@@ -535,6 +601,7 @@ const App: React.FC = () => {
                 onDeleteCase={deleteCase}
                 onTransferStage={transferStage}
                 onUpdateCase={updateCase}
+                onEditCase={handleEditCase} // Truyền hàm xử lý chỉnh sửa
                 showWarnings={activeTab === 'expiring'}
               />
             </>
