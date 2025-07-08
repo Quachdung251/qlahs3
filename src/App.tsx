@@ -291,7 +291,10 @@ const App: React.FC = () => {
 
   // Hàm lưu dữ liệu lên Supabase
   const handleSaveDataToSupabase = async () => {
-    if (!user || !supabase) {
+    const currentUser = user; // Chụp giá trị user hiện tại
+    const currentSupabase = supabase; // Chụp giá trị supabase client hiện tại
+
+    if (!currentUser || !currentSupabase) {
       setBackupMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
       return;
     }
@@ -305,10 +308,10 @@ const App: React.FC = () => {
       };
 
       // Sử dụng upsert để chỉ lưu 1 bản backup duy nhất cho mỗi user
-      const { error } = await supabase
+      const { error } = await currentSupabase // Sử dụng biến đã chụp
         .from('user_backups')
         .upsert(
-          { user_id: user.id, data: combinedData, created_at: new Date().toISOString() },
+          { user_id: currentUser.id, data: combinedData, created_at: new Date().toISOString() }, // Sử dụng biến đã chụp
           { onConflict: 'user_id' } // Nếu có conflict với user_id, sẽ update bản ghi đó
         );
 
@@ -326,7 +329,10 @@ const App: React.FC = () => {
 
   // Hàm khôi phục dữ liệu từ Supabase
   const handleLoadDataFromSupabase = async () => {
-    if (!user || !supabase) {
+    const currentUser = user; // Chụp giá trị user hiện tại
+    const currentSupabase = supabase; // Chụp giá trị supabase client hiện tại
+
+    if (!currentUser || !currentSupabase) {
       setRestoreMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
       return;
     }
@@ -334,10 +340,10 @@ const App: React.FC = () => {
     setRestoreMessage(null);
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await currentSupabase // Sử dụng biến đã chụp
         .from('user_backups')
         .select('data')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id) // Sử dụng biến đã chụp
         .single(); // Lấy bản ghi duy nhất
 
       if (error && error.code !== 'PGRST116') { // PGRST116 là lỗi không tìm thấy bản ghi
@@ -366,12 +372,23 @@ const App: React.FC = () => {
     setRestoreLoading(true); // Bắt đầu lại trạng thái loading cho khôi phục
     setRestoreMessage(null);
 
+    const currentUser = user; // Chụp giá trị user hiện tại
+    const currentSupabase = supabase; // Chụp giá trị supabase client hiện tại
+
+    if (!currentUser || !currentSupabase) {
+      // Trường hợp này lý tưởng là không xảy ra nếu handleLoadDataFromSupabase đã xử lý đúng,
+      // nhưng đây là một lớp bảo vệ bổ sung.
+      setRestoreMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
+      setRestoreLoading(false); // Đảm bảo trạng thái loading được reset
+      return;
+    }
+
     try {
       // Đọc lại dữ liệu từ Supabase để đảm bảo dữ liệu mới nhất
-      const { data, error } = await supabase
+      const { data, error } = await currentSupabase // Sử dụng biến đã chụp
         .from('user_backups')
         .select('data')
-        .eq('user_id', user!.id) // user đã được kiểm tra ở trên
+        .eq('user_id', currentUser.id) // Sử dụng biến đã chụp
         .single();
 
       if (error || !data || !data.data) {
