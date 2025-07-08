@@ -17,7 +17,7 @@ export const useReports = (userKey: string, isDBInitialized: boolean) => {
         setReports(savedReports);
       } catch (error) {
         console.error('Failed to load reports:', error);
-        // Fallback to localStorage
+        // Fallback to localStorage (consider removing localStorage fallback if IndexedDB is primary)
         const fallbackReports = localStorage.getItem(`legalReports_${userKey}`);
         if (fallbackReports) {
           setReports(JSON.parse(fallbackReports));
@@ -32,12 +32,13 @@ export const useReports = (userKey: string, isDBInitialized: boolean) => {
 
   // Save reports to IndexedDB whenever reports change
   useEffect(() => {
-    if (!isDBInitialized || isLoading || reports.length < 0) return;
+    // Chỉ lưu khi DB đã khởi tạo và không trong trạng thái loading ban đầu
+    if (!isDBInitialized || isLoading) return; 
 
     const saveReports = async () => {
       try {
         await dbManager.saveData('reports', reports);
-        // Also save to localStorage as backup
+        // Also save to localStorage as backup (consider removing localStorage fallback if IndexedDB is primary)
         localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(reports));
       } catch (error) {
         console.error('Failed to save reports:', error);
@@ -46,12 +47,17 @@ export const useReports = (userKey: string, isDBInitialized: boolean) => {
       }
     };
 
-    saveReports();
+    // Delay saving slightly to avoid too frequent writes if state changes rapidly
+    const handler = setTimeout(() => {
+      saveReports();
+    }, 500); // Save after 500ms of inactivity
+
+    return () => clearTimeout(handler); // Cleanup timeout on unmount or re-render
   }, [reports, userKey, isLoading, isDBInitialized]);
 
   const addReport = (reportData: ReportFormData) => {
     const newReport: Report = {
-      id: Date.now().toString(),
+      id: Date.now().toString(), // Đảm bảo ID là duy nhất
       ...reportData,
       stage: 'Đang xử lý',
       createdAt: getCurrentDate()
@@ -103,6 +109,29 @@ export const useReports = (userKey: string, isDBInitialized: boolean) => {
     });
   };
 
+  /**
+   * Ghi đè toàn bộ dữ liệu tin báo trong IndexedDB và state.
+   * Được sử dụng khi khôi phục dữ liệu từ Supabase.
+   * @param newReports Mảng các tin báo mới để ghi đè.
+   */
+  const overwriteAllReports = async (newReports: Report[]) => {
+    if (!isDBInitialized) {
+      console.warn('IndexedDB chưa được khởi tạo, không thể ghi đè dữ liệu tin báo.');
+      return;
+    }
+    setIsLoading(true); // Đặt loading để tránh lưu tự động trong quá trình ghi đè
+    try {
+      await dbManager.saveData('reports', newReports); // Ghi đè tất cả dữ liệu tin báo
+      setReports(newReports); // Cập nhật state React
+      localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(newReports)); // Cập nhật localStorage
+      console.log('Đã ghi đè tất cả tin báo từ backup thành công.');
+    } catch (error) {
+      console.error('Lỗi khi ghi đè tin báo từ backup:', error);
+    } finally {
+      setIsLoading(false); // Kết thúc loading
+    }
+  };
+
   return {
     reports,
     addReport,
@@ -111,6 +140,7 @@ export const useReports = (userKey: string, isDBInitialized: boolean) => {
     transferReportStage,
     getReportsByStage,
     getExpiringSoonReports,
-    isLoading
+    isLoading,
+    overwriteAllReports, // <--- ĐÃ THÊM: Trả về hàm ghi đè
   };
 };
