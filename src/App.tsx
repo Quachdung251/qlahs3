@@ -301,15 +301,7 @@ const App: React.FC = () => {
                 onProsecutorChange={setSelectedProsecutor}
                 prosecutors={prosecutors}
               />
-              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho tin báo */}
-                <button
-                  onClick={handleExportReportsToExcel}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  <Download size={16} />
-                  Xuất Excel Tin Báo
-                </button>
-              </div>
+              {/* Nút xuất Excel Tin Báo đã được di chuyển lên tab "Thống kê" */}
               <ReportTable
                 reports={getReportTableData()}
                 columns={getReportTableColumns(activeTab)}
@@ -351,6 +343,16 @@ const App: React.FC = () => {
         default: // Tabs khác (all, investigation, prosecution, trial, expiring)
           return (
             <>
+              {/* Đảm bảo chỉ có MỘT nút Xuất Excel Vụ Án ở đây */}
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleExportCasesToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Vụ Án
+                </button>
+              </div>
               <SearchFilter
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
@@ -358,15 +360,6 @@ const App: React.FC = () => {
                 onProsecutorChange={setSelectedProsecutor}
                 prosecutors={prosecutors}
               />
-              {/* <div className="flex justify-end mb-4"> Loại bỏ nút xuất Excel ở đây cho Vụ Án (bị trùng) */}
-              {/* <button
-                  onClick={handleExportCasesToExcel}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  <Download size={16} />
-                  Xuất Excel Vụ Án
-                </button>
-              </div> */}
               <CaseTable
                 cases={getCaseTableData()}
                 columns={getCaseTableColumns(activeTab)}
