@@ -18,7 +18,6 @@ import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './api/prosecutors';
 import { useProsecutors } from './hooks/useProsecutors';
-// <--- THAY ĐỔI DÒNG NÀY: Import cả prepareCaseDataForExcel và prepareReportDataForExcel
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel } from './utils/excelExportUtils'; 
 import { CaseFormData } from './types'; // Import CaseFormData để có type cho cases
 
@@ -270,7 +269,20 @@ const App: React.FC = () => {
         case 'add':
           return <ReportForm onAddReport={addReport} onTransferToCase={addCase} prosecutors={prosecutors} />;
         case 'statistics':
-          return <ReportStatistics reports={reports} />;
+          return (
+            <>
+              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho thống kê tin báo */}
+                <button
+                  onClick={handleExportReportsToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Tin Báo
+                </button>
+              </div>
+              <ReportStatistics reports={reports} />
+            </>
+          );
         case 'data':
           return (
             <DataManagement
@@ -279,7 +291,7 @@ const App: React.FC = () => {
               currentUserId={user?.id || ''}
             />
           );
-        default:
+        default: // Tabs khác (all, pending, expiring)
           return (
             <>
               <SearchFilter
@@ -314,7 +326,20 @@ const App: React.FC = () => {
         case 'add':
           return <CaseForm onAddCase={addCase} prosecutors={prosecutors} />;
         case 'statistics':
-          return <Statistics cases={cases} />;
+          return (
+            <>
+              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho thống kê vụ án */}
+                <button
+                  onClick={handleExportCasesToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Vụ Án
+                </button>
+              </div>
+              <Statistics cases={cases} />
+            </>
+          );
         case 'data':
           return (
             <DataManagement
@@ -323,7 +348,7 @@ const App: React.FC = () => {
               currentUserId={user?.id || ''}
             />
           );
-        default:
+        default: // Tabs khác (all, investigation, prosecution, trial, expiring)
           return (
             <>
               <SearchFilter
@@ -333,15 +358,15 @@ const App: React.FC = () => {
                 onProsecutorChange={setSelectedProsecutor}
                 prosecutors={prosecutors}
               />
-              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho vụ án */}
-                <button
+              {/* <div className="flex justify-end mb-4"> Loại bỏ nút xuất Excel ở đây cho Vụ Án (bị trùng) */}
+              {/* <button
                   onClick={handleExportCasesToExcel}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 >
                   <Download size={16} />
                   Xuất Excel Vụ Án
                 </button>
-              </div>
+              </div> */}
               <CaseTable
                 cases={getCaseTableData()}
                 columns={getCaseTableColumns(activeTab)}
