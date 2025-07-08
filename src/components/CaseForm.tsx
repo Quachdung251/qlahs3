@@ -1,21 +1,29 @@
 // src/components/CaseForm.tsx
-import React, { useState } from 'react';
-import { Plus, Minus, User, FileText, Shield, Clock } from 'lucide-react';
-import { CaseFormData, Defendant } from '../types';
+import React, { useState, useEffect } from 'react'; // Thêm useEffect
+import { Plus, Minus, User, FileText, Shield, Clock, X } from 'lucide-react'; // Thêm X icon
+import { CaseFormData, Defendant, Case } from '../types'; // Import Case type
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
 import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
-// import { prosecutorsData } from '../data/prosecutors'; // XÓA DÒNG NÀY HOẶC COMMENT LẠI
-import { Prosecutor } from '../api/prosecutors'; // <--- THÊM DÒNG NÀY: Import Prosecutor interface từ api/prosecutors
+import { Prosecutor } from '../api/prosecutors';
 
 interface CaseFormProps {
-  onAddCase: (caseData: CaseFormData) => void;
-  prosecutors: Prosecutor[]; // <--- THÊM PROP NÀY
+  onSubmit: (caseData: CaseFormData, isEditing: boolean) => void; // Thay thế onAddCase và onUpdateCase
+  prosecutors: Prosecutor[];
+  initialData?: Case | null; // Dữ liệu ban đầu khi chỉnh sửa
+  onCancelEdit?: () => void; // Hàm để hủy chỉnh sửa
 }
 
-const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // Nhận prop prosecutors
-  const [formData, setFormData] = useState<CaseFormData>({
+const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData, onCancelEdit }) => {
+  const [formData, setFormData] = useState<CaseFormData>(initialData ? {
+    name: initialData.name,
+    charges: initialData.charges,
+    investigationDeadline: initialData.investigationDeadline,
+    prosecutor: initialData.prosecutor,
+    notes: initialData.notes,
+    defendants: initialData.defendants.map(d => ({ ...d })) // Tạo bản sao sâu để tránh thay đổi state trực tiếp
+  } : {
     name: '',
     charges: '',
     investigationDeadline: getCurrentDate(),
@@ -24,37 +32,64 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // N
     defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
   });
 
+  // Sử dụng useEffect để cập nhật formData khi initialData thay đổi (ví dụ: khi chuyển từ thêm mới sang chỉnh sửa hoặc ngược lại)
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name,
+        charges: initialData.charges,
+        investigationDeadline: initialData.investigationDeadline,
+        prosecutor: initialData.prosecutor,
+        notes: initialData.notes,
+        defendants: initialData.defendants.map(d => ({ ...d }))
+      });
+    } else {
+      // Reset form khi không có initialData (chế độ thêm mới)
+      setFormData({
+        name: '',
+        charges: '',
+        investigationDeadline: getCurrentDate(),
+        prosecutor: '',
+        notes: '',
+        defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
+      });
+    }
+  }, [initialData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Auto-generate case name if empty
     let finalCaseData = { ...formData };
-    if (!formData.name.trim() && formData.defendants.length > 0 && formData.defendants[0].name.trim()) {
+    // Auto-generate case name if empty and in add mode (not editing)
+    if (!initialData && !formData.name.trim() && formData.defendants.length > 0 && formData.defendants[0].name.trim()) {
       const firstDefendant = formData.defendants[0];
       const caseName = `${firstDefendant.name} - ${firstDefendant.charges || 'Chưa xác định tội danh'}`;
       finalCaseData.name = caseName;
     }
 
-    // Auto-set case charges from first defendant if empty
-    if (!formData.charges.trim() && formData.defendants.length > 0 && formData.defendants[0].charges.trim()) {
+    // Auto-set case charges from first defendant if empty and in add mode (not editing)
+    if (!initialData && !formData.charges.trim() && formData.defendants.length > 0 && formData.defendants[0].charges.trim()) {
       finalCaseData.charges = formData.defendants[0].charges;
     }
 
-    // Thêm kiểm tra cho selectedProsecutor (formData.prosecutor)
     if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
       alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách.');
       return;
     }
     
-    onAddCase(finalCaseData);
-    setFormData({
-      name: '',
-      charges: '',
-      investigationDeadline: getCurrentDate(),
-      prosecutor: '',
-      notes: '',
-      defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
-    });
+    onSubmit(finalCaseData, !!initialData); // Gọi onSubmit, truyền cờ isEditing
+    
+    // Reset form chỉ khi ở chế độ thêm mới
+    if (!initialData) {
+      setFormData({
+        name: '',
+        charges: '',
+        investigationDeadline: getCurrentDate(),
+        prosecutor: '',
+        notes: '',
+        defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
+      });
+    }
   };
 
   const addDefendant = () => {
@@ -84,8 +119,9 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // N
     });
     setFormData({ ...formData, defendants: updatedDefendants });
 
-    // Auto-update case charges when first defendant's charges change
-    if (index === 0 && field === 'charges' && !formData.charges.trim()) {
+    // Auto-update case charges when first defendant's charges change, only if case charges are empty
+    // and not in editing mode (to avoid overriding existing charges during edit)
+    if (!initialData && index === 0 && field === 'charges' && !formData.charges.trim()) {
       setFormData(prev => ({ ...prev, charges: value, defendants: updatedDefendants }));
     }
   };
@@ -97,18 +133,28 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // N
     description: item.description
   }));
 
-  // <--- THAY ĐỔI DÒNG NÀY: Sử dụng props.prosecutors thay vì prosecutorsData
   const prosecutorOptions = prosecutors.map(prosecutor => ({
     value: prosecutor.name,
     label: prosecutor.name,
     description: `${prosecutor.title}${prosecutor.department ? ` - ${prosecutor.department}` : ''}`
   }));
 
+  const isEditing = !!initialData;
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-        <Plus className="text-blue-600" size={24} />
-        Thêm Vụ Án Mới
+        {isEditing ? (
+          <>
+            <Edit2 className="text-blue-600" size={24} />
+            Chỉnh Sửa Vụ Án
+          </>
+        ) : (
+          <>
+            <Plus className="text-blue-600" size={24} />
+            Thêm Vụ Án Mới
+          </>
+        )}
       </h2>
       
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -117,21 +163,22 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // N
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <FileText size={16} className="inline mr-1" />
-              Tên Vụ Án <span className="text-gray-500 text-xs">(để trống sẽ tự động tạo từ tên bị can đầu tiên)</span>
+              Tên Vụ Án {isEditing ? '' : <span className="text-gray-500 text-xs">(để trống sẽ tự động tạo từ tên bị can đầu tiên)</span>}
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Nhập tên vụ án hoặc để trống để tự động tạo"
+              placeholder="Nhập tên vụ án"
+              required // Tên vụ án luôn bắt buộc
             />
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Shield size={16} className="inline mr-1" />
-              Tội Danh Vụ Án (Điều, Khoản) <span className="text-gray-500 text-xs">(tự động từ bị can số 1)</span>
+              Tội Danh Vụ Án (Điều, Khoản) {isEditing ? '' : <span className="text-gray-500 text-xs">(tự động từ bị can số 1)</span>}
             </label>
             <AutocompleteInput
               value={formData.charges}
@@ -158,7 +205,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // N
             <AutocompleteInput
               value={formData.prosecutor}
               onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions} // Sử dụng prosecutorOptions đã được tạo từ props.prosecutors
+              options={prosecutorOptions}
               placeholder="Nhập hoặc chọn kiểm sát viên"
               required
               icon={<User size={16} />}
@@ -195,10 +242,10 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // N
           </div>
           
           {formData.defendants.map((defendant, index) => (
-            <div key={index} className="bg-gray-50 p-4 rounded-md mb-4">
+            <div key={defendant.id || index} className="bg-gray-50 p-4 rounded-md mb-4"> {/* Sử dụng defendant.id nếu có, nếu không thì index */}
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-lg font-medium text-gray-700">
-                  Bị Can {index + 1} {index === 0 && <span className="text-sm text-blue-600">(tội danh sẽ tự động áp dụng cho vụ án)</span>}
+                  Bị Can {index + 1} {index === 0 && !isEditing && <span className="text-sm text-blue-600">(tội danh sẽ tự động áp dụng cho vụ án)</span>}
                 </h4>
                 {formData.defendants.length > 1 && (
                   <button
@@ -268,12 +315,22 @@ const CaseForm: React.FC<CaseFormProps> = ({ onAddCase, prosecutors }) => { // N
           ))}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          {isEditing && onCancelEdit && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors font-medium"
+            >
+              <X size={16} />
+              Hủy Bỏ
+            </button>
+          )}
           <button
             type="submit"
             className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
           >
-            Thêm Vụ Án
+            {isEditing ? 'Cập Nhật Vụ Án' : 'Thêm Vụ Án'}
           </button>
         </div>
       </form>
