@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Scale, FileText, LogOut, Users, Download } from 'lucide-react'; // Thêm Download icon
+import { Scale, FileText, LogOut, Users, Download, Cloud, Upload } from 'lucide-react'; // Thêm Cloud, Upload icon
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
 import CaseTable from './components/CaseTable';
@@ -18,7 +18,6 @@ import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './api/prosecutors';
 import { useProsecutors } from './hooks/useProsecutors';
-// THAY ĐỔI DÒNG NÀY: Import cả prepareCaseStatisticsForExcel và prepareReportStatisticsForExcel
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
 import { CaseFormData } from './types'; // Import CaseFormData để có type cho cases
 import { getCurrentDate } from './utils/dateUtils'; // Import getCurrentDate
@@ -26,7 +25,7 @@ import { getCurrentDate } from './utils/dateUtils'; // Import getCurrentDate
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
-  const { user, loading: authLoading, signIn, signOut, isAuthenticated } = useSupabaseAuth();
+  const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth(); // Lấy supabase client
   const { isInitialized } = useIndexedDB();
   const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
   const [activeTab, setActiveTab] = useState('add');
@@ -40,8 +39,16 @@ const App: React.FC = () => {
   const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, setProsecutors } = useProsecutors();
 
   const userKey = user?.id || 'default';
-  const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading } = useCases(userKey, isInitialized);
-  const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading } = useReports(userKey, isInitialized);
+  // Cập nhật useCases và useReports để có hàm overwriteAll
+  const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading, overwriteAllCases } = useCases(userKey, isInitialized);
+  const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading, overwriteAllReports } = useReports(userKey, isInitialized);
+
+  // State cho thông báo và trạng thái lưu/khôi phục
+  const [showBackupRestoreModal, setShowBackupRestoreModal] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
 
   // Show loading while initializing or fetching prosecutors
   if (authLoading || !isInitialized || prosecutorsLoading) {
@@ -281,6 +288,93 @@ const App: React.FC = () => {
     }
   };
 
+  // Hàm lưu dữ liệu lên Supabase
+  const handleSaveDataToSupabase = async () => {
+    if (!user || !supabase) {
+      setBackupMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
+      return;
+    }
+    setBackupLoading(true);
+    setBackupMessage(null);
+
+    try {
+      const combinedData = {
+        cases: cases,
+        reports: reports,
+      };
+
+      // Sử dụng upsert để chỉ lưu 1 bản backup duy nhất cho mỗi user
+      const { error } = await supabase
+        .from('user_backups')
+        .upsert(
+          { user_id: user.id, data: combinedData, created_at: new Date().toISOString() },
+          { onConflict: 'user_id' } // Nếu có conflict với user_id, sẽ update bản ghi đó
+        );
+
+      if (error) {
+        throw error;
+      }
+      setBackupMessage('Lưu dữ liệu thành công lên Supabase!');
+    } catch (error: any) {
+      console.error('Lỗi khi lưu dữ liệu lên Supabase:', error.message);
+      setBackupMessage(`Lỗi khi lưu dữ liệu: ${error.message}`);
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // Hàm khôi phục dữ liệu từ Supabase
+  const handleLoadDataFromSupabase = async () => {
+    if (!user || !supabase) {
+      setRestoreMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
+      return;
+    }
+    setRestoreLoading(true);
+    setRestoreMessage(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('user_backups')
+        .select('data')
+        .eq('user_id', user.id)
+        .single(); // Lấy bản ghi duy nhất
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 là lỗi không tìm thấy bản ghi
+        throw error;
+      }
+
+      if (!data || !data.data) {
+        setRestoreMessage('Không tìm thấy bản sao lưu nào trên Supabase.');
+        return;
+      }
+
+      // Hỏi người dùng xác nhận trước khi ghi đè dữ liệu cục bộ
+      const confirmRestore = window.confirm(
+        'Bạn có chắc chắn muốn khôi phục dữ liệu từ Supabase? Thao tác này sẽ GHI ĐÈ toàn bộ dữ liệu hiện có trên thiết bị của bạn và không thể hoàn tác!'
+      );
+
+      if (!confirmRestore) {
+        setRestoreMessage('Đã hủy khôi phục dữ liệu.');
+        return;
+      }
+
+      const restoredData = data.data as { cases: any[]; reports: any[] };
+      
+      // Ghi đè dữ liệu vào IndexedDB thông qua các hooks
+      await overwriteAllCases(restoredData.cases);
+      await overwriteAllReports(restoredData.reports);
+
+      setRestoreMessage('Khôi phục dữ liệu thành công từ Supabase! Dữ liệu đã được cập nhật.');
+      // Có thể cần refresh lại trang hoặc các state liên quan nếu dữ liệu không tự động cập nhật
+      // window.location.reload(); // Hoặc gọi lại các hàm fetch dữ liệu
+    } catch (error: any) {
+      console.error('Lỗi khi khôi phục dữ liệu từ Supabase:', error.message);
+      setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
 
   const renderMainContent = () => {
     if (activeSystem === 'reports') {
@@ -307,6 +401,14 @@ const App: React.FC = () => {
                 setToDate={setStatisticsToDate}
               />
             </>
+          );
+        case 'data':
+          return (
+            <DataManagement
+              onUpdateCriminalCode={handleUpdateCriminalCode}
+              onUpdateProsecutors={handleUpdateProsecutors}
+              currentUserId={user?.id || ''}
+            />
           );
         default: // Tabs khác (all, pending, expiring)
           return (
@@ -456,6 +558,16 @@ const App: React.FC = () => {
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
               
+              {/* Nút Lưu/Khôi phục dữ liệu Supabase */}
+              <button
+                onClick={() => setShowBackupRestoreModal(true)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                title="Lưu và Khôi phục dữ liệu từ Supabase"
+              >
+                <Cloud size={16} />
+                Cloud
+              </button>
+
               <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -480,6 +592,55 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderMainContent()}
       </main>
+
+      {/* Modal Lưu/Khôi phục dữ liệu */}
+      {showBackupRestoreModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Lưu & Khôi phục dữ liệu (Supabase)</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Bạn có thể lưu dữ liệu hiện tại lên Supabase hoặc khôi phục dữ liệu đã lưu.
+              Lưu ý: Chỉ có một bản sao lưu duy nhất cho mỗi tài khoản. Khi bạn lưu, bản sao lưu cũ sẽ bị ghi đè.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleSaveDataToSupabase}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                disabled={backupLoading}
+              >
+                {backupLoading ? 'Đang lưu...' : <><Upload size={16} /> Lưu lên Cloud</>}
+              </button>
+              <button
+                onClick={handleLoadDataFromSupabase}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                disabled={restoreLoading}
+              >
+                {restoreLoading ? 'Đang khôi phục...' : <><Download size={16} /> Khôi phục từ Cloud</>}
+              </button>
+              <button
+                onClick={() => {
+                  setShowBackupRestoreModal(false);
+                  setBackupMessage(null);
+                  setRestoreMessage(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Đóng
+              </button>
+            </div>
+            {backupMessage && (
+              <p className={`mt-4 text-sm ${backupMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                {backupMessage}
+              </p>
+            )}
+            {restoreMessage && (
+              <p className={`mt-4 text-sm ${restoreMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                {restoreMessage}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
