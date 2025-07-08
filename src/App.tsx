@@ -18,8 +18,10 @@ import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './api/prosecutors';
 import { useProsecutors } from './hooks/useProsecutors';
-import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel } from './utils/excelExportUtils'; 
+// THAY ĐỔI DÒNG NÀY: Import cả prepareCaseStatisticsForExcel và prepareReportStatisticsForExcel
+import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
 import { CaseFormData } from './types'; // Import CaseFormData để có type cho cases
+import { getCurrentDate } from './utils/dateUtils'; // Import getCurrentDate
 
 type SystemType = 'cases' | 'reports';
 
@@ -31,6 +33,10 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
   
+  // Thêm state cho ngày bắt đầu và ngày kết thúc thống kê
+  const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
+  const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
+
   const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, setProsecutors } = useProsecutors();
 
   const userKey = user?.id || 'default';
@@ -60,6 +66,9 @@ const App: React.FC = () => {
     setActiveTab('add');
     setSearchTerm('');
     setSelectedProsecutor('');
+    // Reset ngày thống kê khi chuyển hệ thống
+    setStatisticsFromDate(getCurrentDate());
+    setStatisticsToDate(getCurrentDate());
   };
 
   const handleUpdateCriminalCode = (data: CriminalCodeItem[]) => {
@@ -244,22 +253,32 @@ const App: React.FC = () => {
 
   const expiringSoonCount = activeSystem === 'cases' ? getExpiringSoonCases().length : getExpiringSoonReports().length;
 
-  // Xử lý xuất Excel cho vụ án với nhiều bị can
+  // Xử lý xuất Excel cho vụ án
   const handleExportCasesToExcel = () => {
-    // Lấy dữ liệu đã được lọc từ getCaseTableData()
-    const filteredCases = getCaseTableData(); 
-    // Sử dụng hàm prepareCaseDataForExcel để chuẩn bị dữ liệu và cột
-    const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases);
-    exportToExcel(dataToExport, columns, 'BaoCaoVuAn');
+    if (activeTab === 'statistics') {
+      // Nếu đang ở tab thống kê, xuất dữ liệu thống kê vụ án
+      const { data: dataToExport, columns } = prepareCaseStatisticsForExcel(cases, statisticsFromDate, statisticsToDate);
+      exportToExcel(dataToExport, columns, 'ThongKeVuAn');
+    } else {
+      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết vụ án
+      const filteredCases = getCaseTableData(); 
+      const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases);
+      exportToExcel(dataToExport, columns, 'DanhSachVuAn');
+    }
   };
 
   // Xử lý xuất Excel cho tin báo
   const handleExportReportsToExcel = () => {
-    // Lấy dữ liệu đã được lọc từ getReportTableData()
-    const filteredReports = getReportTableData();
-    // Sử dụng hàm prepareReportDataForExcel để chuẩn bị dữ liệu và cột
-    const { data: dataToExport, columns } = prepareReportDataForExcel(filteredReports);
-    exportToExcel(dataToExport, columns, 'BaoCaoTinBao');
+    if (activeTab === 'statistics') {
+      // Nếu đang ở tab thống kê, xuất dữ liệu thống kê tin báo
+      const { data: dataToExport, columns } = prepareReportStatisticsForExcel(reports, statisticsFromDate, statisticsToDate);
+      exportToExcel(dataToExport, columns, 'ThongKeTinBao');
+    } else {
+      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết tin báo
+      const filteredReports = getReportTableData();
+      const { data: dataToExport, columns } = prepareReportDataForExcel(filteredReports);
+      exportToExcel(dataToExport, columns, 'DanhSachTinBao');
+    }
   };
 
 
@@ -280,7 +299,13 @@ const App: React.FC = () => {
                   Xuất Excel Tin Báo
                 </button>
               </div>
-              <ReportStatistics reports={reports} />
+              <ReportStatistics 
+                reports={reports} 
+                fromDate={statisticsFromDate}
+                toDate={statisticsToDate}
+                setFromDate={setStatisticsFromDate}
+                setToDate={setStatisticsToDate}
+              />
             </>
           );
         case 'data':
@@ -329,7 +354,13 @@ const App: React.FC = () => {
                   Xuất Excel Vụ Án
                 </button>
               </div>
-              <Statistics cases={cases} />
+              <Statistics 
+                cases={cases} 
+                fromDate={statisticsFromDate}
+                toDate={statisticsToDate}
+                setFromDate={setStatisticsFromDate}
+                setToDate={setStatisticsToDate}
+              />
             </>
           );
         case 'data':
