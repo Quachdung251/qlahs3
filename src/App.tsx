@@ -49,6 +49,7 @@ const App: React.FC = () => {
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false); // State cho modal xác nhận khôi phục
 
   // Show loading while initializing or fetching prosecutors
   if (authLoading || !isInitialized || prosecutorsLoading) {
@@ -348,14 +349,33 @@ const App: React.FC = () => {
         return;
       }
 
-      // Hỏi người dùng xác nhận trước khi ghi đè dữ liệu cục bộ
-      const confirmRestore = window.confirm(
-        'Bạn có chắc chắn muốn khôi phục dữ liệu từ Supabase? Thao tác này sẽ GHI ĐÈ toàn bộ dữ liệu hiện có trên thiết bị của bạn và không thể hoàn tác!'
-      );
+      // Mở modal xác nhận thay vì dùng window.confirm
+      setShowRestoreConfirmModal(true);
 
-      if (!confirmRestore) {
-        setRestoreMessage('Đã hủy khôi phục dữ liệu.');
-        return;
+    } catch (error: any) {
+      console.error('Lỗi khi khôi phục dữ liệu từ Supabase:', error.message);
+      setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  // Hàm xử lý khi người dùng xác nhận khôi phục
+  const confirmRestoreAction = async () => {
+    setShowRestoreConfirmModal(false); // Đóng modal xác nhận
+    setRestoreLoading(true); // Bắt đầu lại trạng thái loading cho khôi phục
+    setRestoreMessage(null);
+
+    try {
+      // Đọc lại dữ liệu từ Supabase để đảm bảo dữ liệu mới nhất
+      const { data, error } = await supabase
+        .from('user_backups')
+        .select('data')
+        .eq('user_id', user!.id) // user đã được kiểm tra ở trên
+        .single();
+
+      if (error || !data || !data.data) {
+        throw new Error(error?.message || 'Không tìm thấy dữ liệu để khôi phục.');
       }
 
       const restoredData = data.data as { cases: any[]; reports: any[] };
@@ -368,13 +388,12 @@ const App: React.FC = () => {
       // Có thể cần refresh lại trang hoặc các state liên quan nếu dữ liệu không tự động cập nhật
       // window.location.reload(); // Hoặc gọi lại các hàm fetch dữ liệu
     } catch (error: any) {
-      console.error('Lỗi khi khôi phục dữ liệu từ Supabase:', error.message);
+      console.error('Lỗi khi khôi phục dữ liệu sau xác nhận:', error.message);
       setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
     } finally {
       setRestoreLoading(false);
     }
   };
-
 
   const renderMainContent = () => {
     if (activeSystem === 'reports') {
@@ -563,6 +582,8 @@ const App: React.FC = () => {
                 onClick={() => setShowBackupRestoreModal(true)}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
                 title="Lưu và Khôi phục dữ liệu từ Supabase"
+                // Disable nút nếu user hoặc supabase chưa sẵn sàng
+                disabled={!user || !supabase} 
               >
                 <Cloud size={16} />
                 Cloud
@@ -638,6 +659,35 @@ const App: React.FC = () => {
                 {restoreMessage}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận khôi phục */}
+      {showRestoreConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận khôi phục dữ liệu</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Bạn có chắc chắn muốn khôi phục dữ liệu từ Supabase? Thao tác này sẽ <span className="font-bold text-red-600">GHI ĐÈ</span> toàn bộ dữ liệu hiện có trên thiết bị của bạn và không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowRestoreConfirmModal(false);
+                  setRestoreMessage('Đã hủy khôi phục dữ liệu.');
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmRestoreAction}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Xác nhận khôi phục
+              </button>
+            </div>
           </div>
         </div>
       )}
