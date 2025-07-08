@@ -1,3 +1,5 @@
+Bị can)">
+```typescript
 import React, { useState, useMemo, useEffect } from 'react';
 import { Scale, FileText, LogOut, Users, Download, Cloud, Upload } from 'lucide-react'; // Thêm Cloud, Upload icon
 import TabNavigation from './components/TabNavigation';
@@ -312,7 +314,7 @@ const App: React.FC = () => {
     // Define base columns that are always present or common
     const baseCaseColumns = [
         { key: 'caseName', label: 'Tên Vụ án' },
-        { key: 'caseCharges', label: 'Tội danh (VA)' },
+        { key: 'defendantsList', label: 'Bị can' }, // <--- THAY ĐỔI: Tội danh (VA) thành Bị can
         { key: 'prosecutor', label: 'KSV' },
         { key: 'caseNotes', label: 'Ghi chú Vụ án' },
         { key: 'stage', label: 'Giai đoạn' },
@@ -385,7 +387,14 @@ const App: React.FC = () => {
                 case 'caseName':
                     row[col.key] = caseItem.name;
                     break;
-                case 'caseCharges':
+                case 'defendantsList': // <--- THAY ĐỔI: Xử lý cột Bị can
+                    if (caseItem.defendants && caseItem.defendants.length > 0) {
+                        row[col.key] = caseItem.defendants.map(d => d.name).join('; ');
+                    } else {
+                        row[col.key] = 'Không có bị can';
+                    }
+                    break;
+                case 'caseCharges': // Giữ nguyên tội danh vụ án nếu nó vẫn cần ở đâu đó
                     row[col.key] = caseItem.charges;
                     break;
                 case 'prosecutor':
@@ -919,3 +928,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+```
