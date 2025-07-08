@@ -1,6 +1,6 @@
 // src/components/CaseForm.tsx
 import React, { useState, useEffect } from 'react'; // Thêm useEffect
-import { Plus, Minus, User, FileText, Shield, Clock, X } from 'lucide-react'; // Thêm X icon
+import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2 } from 'lucide-react'; // Thêm X icon và Edit2
 import { CaseFormData, Defendant, Case } from '../types'; // Import Case type
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
