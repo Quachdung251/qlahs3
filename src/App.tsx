@@ -345,9 +345,9 @@ const App: React.FC = () => {
         case 'prosecution':
             columns = [
                 ...baseCaseColumns.filter(col => col.key !== 'stage'),
-                { key: 'investigationDeadline', label: 'Thời hạn ĐT (Ban đầu)' }, // Keep initial investigation deadline
+                // Đã bỏ cột 'Thời hạn ĐT (Ban đầu)'
                 { key: 'totalDefendants', label: 'Tổng Bị can' },
-                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
+                // Đã bỏ cột 'BP Ngăn chặn ngắn nhất'
                 { key: 'prosecutionTransferDate', label: 'Ngày chuyển TT' }, // NEW
                 { key: 'stage', label: 'Giai đoạn' },
             ];
@@ -355,9 +355,9 @@ const App: React.FC = () => {
         case 'trial':
             columns = [
                 ...baseCaseColumns.filter(col => col.key !== 'stage'),
-                { key: 'investigationDeadline', label: 'Thời hạn ĐT (Ban đầu)' }, // Keep initial investigation deadline
+                // Đã bỏ cột 'Thời hạn ĐT (Ban đầu)'
                 { key: 'totalDefendants', label: 'Tổng Bị can' },
-                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
+                // Đã bỏ cột 'BP Ngăn chặn ngắn nhất'
                 { key: 'trialTransferDate', label: 'Ngày chuyển XX' }, // NEW
                 { key: 'stage', label: 'Giai đoạn' },
             ];
@@ -378,43 +378,65 @@ const App: React.FC = () => {
     }
 
     casesToExport.forEach(caseItem => {
-        const row: any = {
-            caseName: caseItem.name,
-            caseCharges: caseItem.charges,
-            prosecutor: caseItem.prosecutor,
-            caseNotes: caseItem.notes,
-            stage: caseItem.stage,
-            investigationDeadline: caseItem.investigationDeadline,
-            prosecutionTransferDate: caseItem.prosecutionTransferDate || '',
-            trialTransferDate: caseItem.trialTransferDate || '',
-        };
+        const row: any = {}; // Initialize an empty row
 
-        // Calculate derived values if needed for specific tabs
-        // Note: 'investigationRemaining' and 'shortestDetentionRemaining' are only added to the row object
-        // if the currentTab is 'investigation', 'expiring', or 'all'.
-        // This ensures they are only populated when the column is actually defined in the 'columns' array for that tab.
-        if (['investigation', 'expiring', 'all'].includes(currentTab)) {
-            row.investigationRemaining = `${getDaysRemaining(caseItem.investigationDeadline)} ngày`;
-        } else {
-            // Explicitly set to undefined or null if not needed for the current tab
-            row.investigationRemaining = undefined;
-        }
-
-
-        const detainedDefendants = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-        row.totalDefendants = caseItem.defendants.length > 0 ? `${caseItem.defendants.length} bị can` : '0 bị can';
-        if (detainedDefendants.length > 0) {
-            const shortestDays = Math.min(...detainedDefendants.map(d => getDaysRemaining(d.detentionDeadline!)));
-            row.shortestDetention = `${shortestDays} ngày`;
-            if (['investigation', 'expiring', 'all'].includes(currentTab)) {
-                row.shortestDetentionRemaining = `${shortestDays} ngày`;
-            } else {
-                row.shortestDetentionRemaining = undefined;
+        columns.forEach(col => { // Iterate through the selected columns for this tab
+            switch (col.key) {
+                case 'caseName':
+                    row[col.key] = caseItem.name;
+                    break;
+                case 'caseCharges':
+                    row[col.key] = caseItem.charges;
+                    break;
+                case 'prosecutor':
+                    row[col.key] = caseItem.prosecutor;
+                    break;
+                case 'caseNotes':
+                    row[col.key] = caseItem.notes;
+                    break;
+                case 'stage':
+                    row[col.key] = caseItem.stage;
+                    break;
+                case 'investigationDeadline':
+                    row[col.key] = caseItem.investigationDeadline;
+                    break;
+                case 'prosecutionTransferDate':
+                    row[col.key] = caseItem.prosecutionTransferDate || '';
+                    break;
+                case 'trialTransferDate':
+                    row[col.key] = caseItem.trialTransferDate || '';
+                    break;
+                case 'investigationRemaining':
+                    row[col.key] = `${getDaysRemaining(caseItem.investigationDeadline)} ngày`;
+                    break;
+                case 'totalDefendants':
+                    row[col.key] = caseItem.defendants.length > 0 ? `${caseItem.defendants.length} bị can` : '0 bị can';
+                    break;
+                case 'shortestDetention':
+                    const detainedDefsForShortestDetention = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+                    if (detainedDefsForShortestDetention.length > 0) {
+                        const shortestDays = Math.min(...detainedDefsForShortestDetention.map(d => getDaysRemaining(d.detentionDeadline!)));
+                        row[col.key] = `${shortestDays} ngày`;
+                    } else {
+                        row[col.key] = 'Không có';
+                    }
+                    break;
+                case 'shortestDetentionRemaining':
+                    const detainedDefsForShortestDetentionRemaining = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+                    if (detainedDefsForShortestDetentionRemaining.length > 0) {
+                        const shortestDays = Math.min(...detainedDefsForShortestDetentionRemaining.map(d => getDaysRemaining(d.detentionDeadline!)));
+                        row[col.key] = `${shortestDays} ngày`;
+                    } else {
+                        row[col.key] = 'Không có';
+                    }
+                    break;
+                // Add other case properties here if needed for specific columns
+                default:
+                    // If a column key doesn't match any specific case, try to get it directly from caseItem
+                    // This handles generic keys like 'id', 'createdAt', etc., if they were to be added.
+                    row[col.key] = (caseItem as any)[col.key] || '';
             }
-        } else {
-            row.shortestDetention = 'Không có';
-            row.shortestDetentionRemaining = undefined; // Ensure it's undefined if no detained defendants
-        }
+        });
 
         dataToExport.push(row);
     });
@@ -431,7 +453,6 @@ const App: React.FC = () => {
     } else {
       // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết vụ án dựa trên tab hiện tại
       const filteredCases = getCaseTableData(); // Lấy dữ liệu đã được lọc theo tìm kiếm/kiểm sát viên
-      // <--- THAY ĐỔI Ở ĐÂY: Gọi prepareCaseDataForCurrentTabExport thay vì prepareCaseDataForExcel
       const { data: dataToExport, columns } = prepareCaseDataForCurrentTabExport(filteredCases, activeTab); 
       exportToExcel(dataToExport, columns, 'DanhSachVuAn');
     }
