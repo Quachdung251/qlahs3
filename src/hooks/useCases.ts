@@ -134,11 +134,7 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     }
     setIsLoading(true); // Đặt loading để tránh lưu tự động trong quá trình ghi đè
     try {
-      await dbManager.clear('cases'); // Xóa tất cả dữ liệu cũ trong IndexedDB
-      // Thêm từng vụ án mới vào IndexedDB
-      for (const caseItem of newCases) {
-        await dbManager.add('cases', caseItem); 
-      }
+      await dbManager.saveData('cases', newCases); // Ghi đè tất cả dữ liệu vụ án
       setCases(newCases); // Cập nhật state React
       localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(newCases)); // Cập nhật localStorage
       console.log('Đã ghi đè tất cả vụ án từ backup thành công.');

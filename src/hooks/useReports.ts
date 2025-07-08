@@ -121,11 +121,7 @@ export const useReports = (userKey: string, isDBInitialized: boolean) => {
     }
     setIsLoading(true); // Đặt loading để tránh lưu tự động trong quá trình ghi đè
     try {
-      await dbManager.clear('reports'); // Xóa tất cả dữ liệu cũ trong IndexedDB
-      // Thêm từng tin báo mới vào IndexedDB
-      for (const reportItem of newReports) {
-        await dbManager.add('reports', reportItem); 
-      }
+      await dbManager.saveData('reports', newReports); // Ghi đè tất cả dữ liệu tin báo
       setReports(newReports); // Cập nhật state React
       localStorage.setItem(`legalReports_${userKey}`, JSON.stringify(newReports)); // Cập nhật localStorage
       console.log('Đã ghi đè tất cả tin báo từ backup thành công.');
