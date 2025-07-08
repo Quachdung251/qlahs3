@@ -308,17 +308,18 @@ const App: React.FC = () => {
               />
             </>
           );
-        case 'data':
-          return (
-            <DataManagement
-              onUpdateCriminalCode={handleUpdateCriminalCode}
-              onUpdateProsecutors={handleUpdateProsecutors}
-              currentUserId={user?.id || ''}
-            />
-          );
         default: // Tabs khác (all, pending, expiring)
           return (
             <>
+              <div className="flex justify-end mb-4"> {/* Nút xuất Excel Tin Báo cho các tab danh sách */}
+                <button
+                  onClick={handleExportReportsToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Tin Báo
+                </button>
+              </div>
               <SearchFilter
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
@@ -326,7 +327,6 @@ const App: React.FC = () => {
                 onProsecutorChange={setSelectedProsecutor}
                 prosecutors={prosecutors}
               />
-              {/* Nút xuất Excel Tin Báo đã được di chuyển lên tab "Thống kê" */}
               <ReportTable
                 reports={getReportTableData()}
                 columns={getReportTableColumns(activeTab)}
