@@ -54,50 +54,50 @@ const ReportStatistics: React.FC<ReportStatisticsProps> = ({ reports }) => {
     };
   };
 
-  // Export to Excel function
-  const exportToExcel = () => {
-    const newStats = getNewReportsStats();
-    const processedStats = getProcessedReportsStats();
-    const stageStats = getStageStats();
+  // HÀM exportToExcel CŨ ĐÃ ĐƯỢC CHUYỂN LÊN App.tsx VÀ utils/excelExportUtils.ts
+  // const exportToExcel = () => {
+  //   const newStats = getNewReportsStats();
+  //   const processedStats = getProcessedReportsStats();
+  //   const stageStats = getStageStats();
 
-    const csvRows = [
-      ['BÁO CÁO THỐNG KÊ TIN BÁO'],
-      [`Từ ngày: ${fromDate} - Đến ngày: ${toDate}`],
-      [''],
-      ['PHẦN I: TIN BÁO MỚI TIẾP NHẬN'],
-      ['Chỉ tiêu', 'Số tin báo'],
-      ['Mới tiếp nhận trong kỳ', newStats.toString()],
-      [''],
-      ['PHẦN II: TIN BÁO ĐÃ XỬ LÝ'],
-      ['Chỉ tiêu', 'Số tin báo'],
-      ['Tổng đã xử lý', processedStats.total.toString()],
-      ['- Khởi tố', processedStats.prosecuted.toString()],
-      ['- Không khởi tố', processedStats.notProsecuted.toString()],
-      ['- Tạm đình chỉ', processedStats.suspended.toString()],
-      ['- Chuyển đi', processedStats.transferred.toString()],
-      [''],
-      ['PHẦN III: PHÂN BỐ THEO TRẠNG THÁI'],
-      ['Trạng thái', 'Số tin báo'],
-      ['Đang xử lý', stageStats.pending.toString()],
-      ['Khởi tố', stageStats.prosecuted.toString()],
-      ['Không khởi tố', stageStats.notProsecuted.toString()],
-      ['Tạm đình chỉ', stageStats.suspended.toString()],
-      ['Chuyển đi', stageStats.transferred.toString()]
-    ];
+  //   const csvRows = [
+  //     ['BÁO CÁO THỐNG KÊ TIN BÁO'],
+  //     [`Từ ngày: ${fromDate} - Đến ngày: ${toDate}`],
+  //     [''],
+  //     ['PHẦN I: TIN BÁO MỚI TIẾP NHẬN'],
+  //     ['Chỉ tiêu', 'Số tin báo'],
+  //     ['Mới tiếp nhận trong kỳ', newStats.toString()],
+  //     [''],
+  //     ['PHẦN II: TIN BÁO ĐÃ XỬ LÝ'],
+  //     ['Chỉ tiêu', 'Số tin báo'],
+  //     ['Tổng đã xử lý', processedStats.total.toString()],
+  //     ['- Khởi tố', processedStats.prosecuted.toString()],
+  //     ['- Không khởi tố', processedStats.notProsecuted.toString()],
+  //     ['- Tạm đình chỉ', processedStats.suspended.toString()],
+  //     ['- Chuyển đi', processedStats.transferred.toString()],
+  //     [''],
+  //     ['PHẦN III: PHÂN BỐ THEO TRẠNG THÁI'],
+  //     ['Trạng thái', 'Số tin báo'],
+  //     ['Đang xử lý', stageStats.pending.toString()],
+  //     ['Khởi tố', stageStats.prosecuted.toString()],
+  //     ['Không khởi tố', stageStats.notProsecuted.toString()],
+  //     ['Tạm đình chỉ', stageStats.suspended.toString()],
+  //     ['Chuyển đi', stageStats.transferred.toString()]
+  //   ];
 
-    const csvContent = csvRows.map(row => row.join('\t')).join('\n');
+  //   const csvContent = csvRows.map(row => row.join('\t')).join('\n');
 
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `thong-ke-tin-bao-${fromDate.replace(/\//g, '-')}-${toDate.replace(/\//g, '-')}.txt`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  //   const BOM = '\uFEFF';
+  //   const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
+  //   const link = document.createElement('a');
+  //   const url = URL.createObjectURL(blob);
+  //   link.setAttribute('href', url);
+  //   link.setAttribute('download', `thong-ke-tin-bao-${fromDate.replace(/\//g, '-')}-${toDate.replace(/\//g, '-')}.txt`);
+  //   link.style.visibility = 'hidden';
+  //   document.body.appendChild(link);
+  //   link.click();
+  //   document.body.removeChild(link);
+  // };
 
   const newStats = getNewReportsStats();
   const processedStats = getProcessedReportsStats();
@@ -127,13 +127,14 @@ const ReportStatistics: React.FC<ReportStatisticsProps> = ({ reports }) => {
           <BarChart3 className="text-blue-600" size={24} />
           Thống Kê Tin Báo
         </h2>
-        <button
+        {/* Nút Xuất Excel đã được di chuyển lên App.tsx, loại bỏ khỏi đây */}
+        {/* <button
           onClick={exportToExcel}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
         >
           <Download size={16} />
           Xuất Excel
-        </button>
+        </button> */}
       </div>
 
       {/* Date Range Selection */}

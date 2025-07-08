@@ -66,38 +66,38 @@ const ReportTable: React.FC<ReportTableProps> = ({
     alert('Tin báo đã được khởi tố và chuyển sang hệ thống quản lý vụ án!');
   };
 
-  // Export to Excel function
-  const exportToExcel = () => {
-    if (reports.length === 0) {
-      alert('Không có dữ liệu để xuất');
-      return;
-    }
+  // HÀM exportToExcel CŨ ĐÃ ĐƯỢC CHUYỂN LÊN App.tsx VÀ utils/excelExportUtils.ts
+  // const exportToExcel = () => {
+  //   if (reports.length === 0) {
+  //     alert('Không có dữ liệu để xuất');
+  //     return;
+  //   }
 
-    const headers = columns.filter(col => col.key !== 'actions').map(col => col.label);
+  //   const headers = columns.filter(col => col.key !== 'actions').map(col => col.label);
     
-    const csvRows = reports.map(report => {
-      return columns.filter(col => col.key !== 'actions').map(col => {
-        const value = report[col.key as keyof Report];
-        return value ? value.toString() : '';
-      });
-    });
+  //   const csvRows = reports.map(report => {
+  //     return columns.filter(col => col.key !== 'actions').map(col => {
+  //       const value = report[col.key as keyof Report];
+  //       return value ? value.toString() : '';
+  //     });
+  //   });
 
-    const csvContent = [
-      headers.join('\t'),
-      ...csvRows.map(row => row.join('\t'))
-    ].join('\n');
+  //   const csvContent = [
+  //     headers.join('\t'),
+  //     ...csvRows.map(row => row.join('\t'))
+  //   ].join('\n');
 
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `danh-sach-tin-bao-${new Date().toISOString().split('T')[0]}.txt`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  //   const BOM = '\uFEFF';
+  //   const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
+  //   const link = document.createElement('a');
+  //   const url = URL.createObjectURL(blob);
+  //   link.setAttribute('href', url);
+  //   link.setAttribute('download', `danh-sach-tin-bao-${new Date().toISOString().split('T')[0]}.txt`);
+  //   link.style.visibility = 'hidden';
+  //   document.body.appendChild(link);
+  //   link.click();
+  //   document.body.removeChild(link);
+  // };
 
   const getStageActions = (report: Report) => {
     const actions = [];
@@ -256,8 +256,8 @@ const ReportTable: React.FC<ReportTableProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      {/* Export Button */}
-      {reports.length > 0 && (
+      {/* Nút Xuất Excel đã được di chuyển lên App.tsx, loại bỏ khỏi đây */}
+      {/* {reports.length > 0 && (
         <div className="p-4 border-b border-gray-200">
           <button
             onClick={exportToExcel}
@@ -267,7 +267,7 @@ const ReportTable: React.FC<ReportTableProps> = ({
             Xuất Excel
           </button>
         </div>
-      )}
+      )} */}
 
       <div className="overflow-x-auto">
         <table className="w-full">

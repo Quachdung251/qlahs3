@@ -1,6 +1,5 @@
-// src/App.tsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { Scale, FileText, LogOut, Users } from 'lucide-react';
+import { Scale, FileText, LogOut, Users, Download } from 'lucide-react'; // Thêm Download icon
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
 import CaseTable from './components/CaseTable';
@@ -17,36 +16,40 @@ import { useReports } from './hooks/useReports';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
 import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
-// import { Prosecutor } from './data/prosecutors'; // XÓA BỎ DÒNG NÀY HOẶC COMMENT LẠI
-import { Prosecutor } from './api/prosecutors'; // <--- THÊM DÒNG NÀY: Import Prosecutor từ api/prosecutors
-import { useProsecutors } from './hooks/useProsecutors'; // <--- THÊM DÒNG NÀY: Import hook useProsecutors
+import { Prosecutor } from './api/prosecutors';
+import { useProsecutors } from './hooks/useProsecutors';
+// THAY ĐỔI DÒNG NÀY: Import cả prepareCaseStatisticsForExcel và prepareReportStatisticsForExcel
+import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
+import { CaseFormData } from './types'; // Import CaseFormData để có type cho cases
+import { getCurrentDate } from './utils/dateUtils'; // Import getCurrentDate
 
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
-  const { user, loading: authLoading, signIn, signOut, isAuthenticated } = useSupabaseAuth(); // Đổi tên 'loading' thành 'authLoading' để tránh trùng với prosecutorsLoading
+  const { user, loading: authLoading, signIn, signOut, isAuthenticated } = useSupabaseAuth();
   const { isInitialized } = useIndexedDB();
   const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
   const [activeTab, setActiveTab] = useState('add');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
+  
+  // Thêm state cho ngày bắt đầu và ngày kết thúc thống kê
+  const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
+  const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
 
-  // <--- THÊM DÒNG NÀY: Sử dụng hook useProsecutors để lấy danh sách KSV
   const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, setProsecutors } = useProsecutors();
-  // console.log("Prosecutors in App:", prosecutors); // Dùng để debug, có thể xóa sau
 
   const userKey = user?.id || 'default';
   const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading } = useCases(userKey, isInitialized);
   const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading } = useReports(userKey, isInitialized);
 
   // Show loading while initializing or fetching prosecutors
-  // <--- THAY ĐỔI ĐIỀU KIỆN LOADING Ở ĐÂY
-  if (authLoading || !isInitialized || prosecutorsLoading) { // Thêm prosecutorsLoading vào điều kiện
+  if (authLoading || !isInitialized || prosecutorsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Scale className="text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-gray-600">Đang khởi tạo hệ thống và tải dữ liệu...</p> {/* Cập nhật thông báo */}
+          <p className="text-gray-600">Đang khởi tạo hệ thống và tải dữ liệu...</p>
         </div>
       </div>
     );
@@ -63,38 +66,39 @@ const App: React.FC = () => {
     setActiveTab('add');
     setSearchTerm('');
     setSelectedProsecutor('');
+    // Reset ngày thống kê khi chuyển hệ thống
+    setStatisticsFromDate(getCurrentDate());
+    setStatisticsToDate(getCurrentDate());
   };
 
   const handleUpdateCriminalCode = (data: CriminalCodeItem[]) => {
     console.log('Updated criminal code data:', data);
   };
 
-  // <--- THAY ĐỔI HÀM NÀY: Cập nhật state prosecutors của App
   const handleUpdateProsecutors = (data: Prosecutor[]) => {
     console.log('Updated prosecutors data in App:', data);
-    setProsecutors(data); // Cập nhật state prosecutors trong App.tsx
+    setProsecutors(data);
   };
 
   // Filter cases/reports based on search term and prosecutor
   const filterItems = (itemsToFilter: any[]) => {
     return itemsToFilter.filter(item => {
-      const matchesSearch = !searchTerm ||
+      const matchesSearch = !searchTerm || 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.charges.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.defendants && item.defendants.some((d: any) =>
+        (item.defendants && item.defendants.some((d: any) => 
           d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           d.charges.toLowerCase().includes(searchTerm.toLowerCase())
         ));
-
-      // So sánh với tên kiểm sát viên (item.prosecutor lưu tên KSV)
-      const matchesProsecutor = !selectedProsecutor ||
+      
+      const matchesProsecutor = !selectedProsecutor || 
         item.prosecutor === selectedProsecutor;
-
+      
       return matchesSearch && matchesProsecutor;
     });
   };
 
-  // Case management columns (giữ nguyên)
+  // Case management columns
   const getCaseTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Vụ án' },
@@ -161,7 +165,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Report management columns (giữ nguyên)
+  // Report management columns
   const getReportTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Tin báo' },
@@ -203,7 +207,7 @@ const App: React.FC = () => {
 
   const getCaseTableData = () => {
     if (casesLoading) return [];
-
+    
     let data;
     switch (activeTab) {
       case 'all':
@@ -229,7 +233,7 @@ const App: React.FC = () => {
 
   const getReportTableData = () => {
     if (reportsLoading) return [];
-
+    
     let data;
     switch (activeTab) {
       case 'all':
@@ -249,31 +253,79 @@ const App: React.FC = () => {
 
   const expiringSoonCount = activeSystem === 'cases' ? getExpiringSoonCases().length : getExpiringSoonReports().length;
 
+  // Xử lý xuất Excel cho vụ án
+  const handleExportCasesToExcel = () => {
+    if (activeTab === 'statistics') {
+      // Nếu đang ở tab thống kê, xuất dữ liệu thống kê vụ án
+      const { data: dataToExport, columns } = prepareCaseStatisticsForExcel(cases, statisticsFromDate, statisticsToDate);
+      exportToExcel(dataToExport, columns, 'ThongKeVuAn');
+    } else {
+      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết vụ án
+      const filteredCases = getCaseTableData(); 
+      const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases);
+      exportToExcel(dataToExport, columns, 'DanhSachVuAn');
+    }
+  };
+
+  // Xử lý xuất Excel cho tin báo
+  const handleExportReportsToExcel = () => {
+    if (activeTab === 'statistics') {
+      // Nếu đang ở tab thống kê, xuất dữ liệu thống kê tin báo
+      const { data: dataToExport, columns } = prepareReportStatisticsForExcel(reports, statisticsFromDate, statisticsToDate);
+      exportToExcel(dataToExport, columns, 'ThongKeTinBao');
+    } else {
+      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết tin báo
+      const filteredReports = getReportTableData();
+      const { data: dataToExport, columns } = prepareReportDataForExcel(filteredReports);
+      exportToExcel(dataToExport, columns, 'DanhSachTinBao');
+    }
+  };
+
+
   const renderMainContent = () => {
     if (activeSystem === 'reports') {
       switch (activeTab) {
         case 'add':
-          // <--- TRUYỀN PROPS prosecutors VÀO ReportForm
           return <ReportForm onAddReport={addReport} onTransferToCase={addCase} prosecutors={prosecutors} />;
         case 'statistics':
-          return <ReportStatistics reports={reports} />;
-        case 'data':
-          return (
-            <DataManagement
-              onUpdateCriminalCode={handleUpdateCriminalCode}
-              onUpdateProsecutors={handleUpdateProsecutors} // <--- TRUYỀN HÀM NÀY ĐỂ DATAMANAGEMENT CÓ THỂ GỌI LÊN
-              currentUserId={user?.id || ''} // Truyền user id để DataManagement có thể sử dụng cho RLS
-            />
-          );
-        default:
           return (
             <>
+              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho thống kê tin báo */}
+                <button
+                  onClick={handleExportReportsToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Tin Báo
+                </button>
+              </div>
+              <ReportStatistics 
+                reports={reports} 
+                fromDate={statisticsFromDate}
+                toDate={statisticsToDate}
+                setFromDate={setStatisticsFromDate}
+                setToDate={setStatisticsToDate}
+              />
+            </>
+          );
+        default: // Tabs khác (all, pending, expiring)
+          return (
+            <>
+              <div className="flex justify-end mb-4"> {/* Nút xuất Excel Tin Báo cho các tab danh sách */}
+                <button
+                  onClick={handleExportReportsToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Tin Báo
+                </button>
+              </div>
               <SearchFilter
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 selectedProsecutor={selectedProsecutor}
                 onProsecutorChange={setSelectedProsecutor}
-                prosecutors={prosecutors} // <--- TRUYỀN PROPS prosecutors VÀO SearchFilter
+                prosecutors={prosecutors}
               />
               <ReportTable
                 reports={getReportTableData()}
@@ -289,27 +341,55 @@ const App: React.FC = () => {
     } else { // activeSystem === 'cases'
       switch (activeTab) {
         case 'add':
-          // <--- TRUYỀN PROPS prosecutors VÀO CaseForm
           return <CaseForm onAddCase={addCase} prosecutors={prosecutors} />;
         case 'statistics':
-          return <Statistics cases={cases} />;
+          return (
+            <>
+              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho thống kê vụ án */}
+                <button
+                  onClick={handleExportCasesToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Vụ Án
+                </button>
+              </div>
+              <Statistics 
+                cases={cases} 
+                fromDate={statisticsFromDate}
+                toDate={statisticsToDate}
+                setFromDate={setStatisticsFromDate}
+                setToDate={setStatisticsToDate}
+              />
+            </>
+          );
         case 'data':
           return (
             <DataManagement
               onUpdateCriminalCode={handleUpdateCriminalCode}
-              onUpdateProsecutors={handleUpdateProsecutors} // <--- TRUYỀN HÀM NÀY ĐỂ DATAMANAGEMENT CÓ THỂ GỌI LÊN
-              currentUserId={user?.id || ''} // Truyền user id để DataManagement có thể sử dụng cho RLS
+              onUpdateProsecutors={handleUpdateProsecutors}
+              currentUserId={user?.id || ''}
             />
           );
-        default:
+        default: // Tabs khác (all, investigation, prosecution, trial, expiring)
           return (
             <>
+              {/* Đảm bảo chỉ có MỘT nút Xuất Excel Vụ Án ở đây */}
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleExportCasesToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Vụ Án
+                </button>
+              </div>
               <SearchFilter
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 selectedProsecutor={selectedProsecutor}
                 onProsecutorChange={setSelectedProsecutor}
-                prosecutors={prosecutors} // <--- TRUYỀN PROPS prosecutors VÀO SearchFilter
+                prosecutors={prosecutors}
               />
               <CaseTable
                 cases={getCaseTableData()}
@@ -336,7 +416,7 @@ const App: React.FC = () => {
                 <Scale className="text-blue-600" size={28} />
                 <h1 className="text-2xl font-bold text-gray-900">Hệ Thống Quản Lý</h1>
               </div>
-
+              
               {/* System Selector */}
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
@@ -363,19 +443,19 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
-
+            
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-500">
-                {activeSystem === 'cases'
+                {activeSystem === 'cases' 
                   ? `Tổng số vụ án: ${cases.length}`
                   : `Tổng số tin báo: ${reports.length}`
                 }
               </div>
-
+              
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
-
+              
               <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -389,9 +469,9 @@ const App: React.FC = () => {
       </header>
 
       {/* Navigation */}
-      <TabNavigation
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+      <TabNavigation 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
         expiringSoonCount={expiringSoonCount}
         systemType={activeSystem}
       />

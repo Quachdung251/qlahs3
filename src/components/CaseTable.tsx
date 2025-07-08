@@ -58,74 +58,69 @@ const CaseTable: React.FC<CaseTableProps> = ({
     setExpandedActions(newExpanded);
   };
 
-  // Export to Excel function with proper CSV formatting
-  const exportToExcel = () => {
-    if (cases.length === 0) {
-      alert('Không có dữ liệu để xuất');
-      return;
-    }
+  // HÀM exportToExcel CŨ ĐÃ ĐƯỢC CHUYỂN LÊN App.tsx VÀ utils/excelExportUtils.ts
+  // const exportToExcel = () => {
+  //   if (cases.length === 0) {
+  //     alert('Không có dữ liệu để xuất');
+  //     return;
+  //   }
 
-    // Create proper CSV headers
-    const headers = columns.filter(col => col.key !== 'actions').map(col => col.label);
-    
-    // Create CSV rows with proper escaping
-    const csvRows = cases.map(caseItem => {
-      return columns.filter(col => col.key !== 'actions').map(col => {
-        let value = '';
-        switch (col.key) {
-          case 'totalDefendants':
-            value = caseItem.defendants.length.toString();
-            break;
-          case 'shortestDetention':
-            const detainedDefendants = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-            if (detainedDefendants.length === 0) {
-              value = 'Không có';
-            } else {
-              const shortestDays = Math.min(...detainedDefendants.map(d => getDaysRemaining(d.detentionDeadline!)));
-              value = `${shortestDays} ngày`;
-            }
-            break;
-          case 'investigationRemaining':
-            value = `${getDaysRemaining(caseItem.investigationDeadline)} ngày`;
-            break;
-          case 'shortestDetentionRemaining':
-            const detainedDefs = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-            if (detainedDefs.length === 0) {
-              value = 'Không có';
-            } else {
-              const shortestDetentionDays = Math.min(...detainedDefs.map(d => getDaysRemaining(d.detentionDeadline!)));
-              value = `${shortestDetentionDays} ngày`;
-            }
-            break;
-          case 'notes':
-            value = caseItem.notes || '';
-            break;
-          default:
-            const cellValue = caseItem[col.key as keyof Case];
-            value = cellValue ? cellValue.toString() : '';
-        }
-        return value;
-      });
-    });
+  //   const headers = columns.filter(col => col.key !== 'actions').map(col => col.label);
+  //   const csvRows = cases.map(caseItem => {
+  //     return columns.filter(col => col.key !== 'actions').map(col => {
+  //       let value = '';
+  //       switch (col.key) {
+  //         case 'totalDefendants':
+  //           value = caseItem.defendants.length.toString();
+  //           break;
+  //         case 'shortestDetention':
+  //           const detainedDefendants = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+  //           if (detainedDefendants.length === 0) {
+  //             value = 'Không có';
+  //           } else {
+  //             const shortestDays = Math.min(...detainedDefendants.map(d => getDaysRemaining(d.detentionDeadline!)));
+  //             value = `${shortestDays} ngày`;
+  //           }
+  //           break;
+  //         case 'investigationRemaining':
+  //           value = `${getDaysRemaining(caseItem.investigationDeadline)} ngày`;
+  //           break;
+  //         case 'shortestDetentionRemaining':
+  //           const detainedDefs = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+  //           if (detainedDefs.length === 0) {
+  //             value = 'Không có';
+  //           } else {
+  //             const shortestDetentionDays = Math.min(...detainedDefs.map(d => getDaysRemaining(d.detentionDeadline!)));
+  //             value = `${shortestDetentionDays} ngày`;
+  //           }
+  //           break;
+  //         case 'notes':
+  //           value = caseItem.notes || '';
+  //           break;
+  //         default:
+  //           const cellValue = caseItem[col.key as keyof Case];
+  //           value = cellValue ? cellValue.toString() : '';
+  //       }
+  //       return value;
+  //     });
+  //   });
 
-    // Create CSV content with proper formatting
-    const csvContent = [
-      headers.join('\t'), // Use tab separator for better Excel compatibility
-      ...csvRows.map(row => row.join('\t'))
-    ].join('\n');
+  //   const csvContent = [
+  //     headers.join('\t'), 
+  //     ...csvRows.map(row => row.join('\t'))
+  //   ].join('\n');
 
-    // Add BOM for UTF-8 to ensure proper display in Excel
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `danh-sach-vu-an-${new Date().toISOString().split('T')[0]}.txt`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  //   const BOM = '\uFEFF';
+  //   const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
+  //   const link = document.createElement('a');
+  //   const url = URL.createObjectURL(blob);
+  //   link.setAttribute('href', url);
+  //   link.setAttribute('download', `danh-sach-vu-an-${new Date().toISOString().split('T')[0]}.txt`);
+  //   link.style.visibility = 'hidden';
+  //   document.body.appendChild(link);
+  //   link.click();
+  //   document.body.removeChild(link);
+  // };
 
   const getStageActions = (caseItem: Case) => {
     const actions = [];
@@ -347,8 +342,8 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      {/* Export Button */}
-      {cases.length > 0 && (
+      {/* Nút Xuất Excel đã được di chuyển lên App.tsx, loại bỏ khỏi đây */}
+      {/* {cases.length > 0 && (
         <div className="p-4 border-b border-gray-200">
           <button
             onClick={exportToExcel}
@@ -358,7 +353,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
             Xuất Excel
           </button>
         </div>
-      )}
+      )} */}
 
       <div className="overflow-x-auto">
         <table className="w-full">
