@@ -18,9 +18,10 @@ import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './api/prosecutors';
 import { useProsecutors } from './hooks/useProsecutors';
-import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
-import { CaseFormData } from './types'; // Import CaseFormData để có type cho cases
-import { getCurrentDate } from './utils/dateUtils'; // Import getCurrentDate
+// Đã loại bỏ prepareCaseDataForExcel khỏi import vì nó không còn được sử dụng trực tiếp ở đây
+import { exportToExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
+import { Case, Report, CaseFormData } from './types'; // Import Case và Report types
+import { getCurrentDate, getDaysRemaining } from './utils/dateUtils'; // Import getCurrentDate và getDaysRemaining
 
 type SystemType = 'cases' | 'reports';
 
@@ -35,6 +36,10 @@ const App: React.FC = () => {
   // Thêm state cho ngày bắt đầu và ngày kết thúc thống kê
   const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
   const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
+
+  // Thêm state để quản lý vụ án/tin báo đang được chỉnh sửa
+  const [editingCase, setEditingCase] = useState<Case | null>(null);
+  const [editingReport, setEditingReport] = useState<Report | null>(null);
 
   const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, setProsecutors } = useProsecutors();
 
@@ -74,6 +79,8 @@ const App: React.FC = () => {
     setActiveTab('add');
     setSearchTerm('');
     setSelectedProsecutor('');
+    setEditingCase(null); // Clear editing state when switching systems
+    setEditingReport(null); // Clear editing state when switching systems
     // Reset ngày thống kê khi chuyển hệ thống
     setStatisticsFromDate(getCurrentDate());
     setStatisticsToDate(getCurrentDate());
@@ -86,6 +93,42 @@ const App: React.FC = () => {
   const handleUpdateProsecutors = (data: Prosecutor[]) => {
     console.log('Updated prosecutors data in App:', data);
     setProsecutors(data);
+  };
+
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
+  const handleEditCase = (caseToEdit: Case) => {
+    setEditingCase(caseToEdit);
+    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
+  };
+
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một tin báo
+  const handleEditReport = (reportToEdit: Report) => {
+    setEditingReport(reportToEdit);
+    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setActiveSystem('reports'); // Đảm bảo hệ thống tin báo đang hoạt động
+  };
+
+  // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
+  const handleCaseFormSubmit = (caseData: CaseFormData, isEditing: boolean) => {
+    if (isEditing && editingCase) {
+      updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt });
+      setEditingCase(null); // Xóa trạng thái chỉnh sửa
+      setActiveTab('all'); // Chuyển về tab danh sách
+    } else {
+      addCase(caseData);
+    }
+  };
+
+  // Hàm xử lý khi form chỉnh sửa tin báo hoàn tất (lưu hoặc hủy)
+  const handleReportFormSubmit = (reportData: ReportFormData, isEditing: boolean) => {
+    if (isEditing && editingReport) {
+      updateReport({ ...reportData, id: editingReport.id, stage: editingReport.stage, createdAt: editingReport.createdAt });
+      setEditingReport(null); // Xóa trạng thái chỉnh sửa
+      setActiveTab('all'); // Chuyển về tab danh sách
+    } else {
+      addReport(reportData);
+    }
   };
 
   // Filter cases/reports based on search term and prosecutor
@@ -261,6 +304,154 @@ const App: React.FC = () => {
 
   const expiringSoonCount = activeSystem === 'cases' ? getExpiringSoonCases().length : getExpiringSoonReports().length;
 
+  // Helper function to prepare case data for Excel based on the active tab
+  const prepareCaseDataForCurrentTabExport = (casesToExport: Case[], currentTab: string) => {
+    let dataToExport: any[] = [];
+    let columns: { key: string; label: string }[] = [];
+
+    // Define base columns that are always present or common
+    const baseCaseColumns = [
+        { key: 'caseName', label: 'Tên Vụ án' },
+        { key: 'defendantsList', label: 'Bị can' }, // <--- THAY ĐỔI: Tội danh (VA) thành Bị can
+        { key: 'prosecutor', label: 'KSV' },
+        { key: 'caseNotes', label: 'Ghi chú Vụ án' },
+        { key: 'stage', label: 'Giai đoạn' },
+    ];
+
+    // Define columns specific to each tab for export
+    switch (currentTab) {
+        case 'all':
+            columns = [
+                ...baseCaseColumns.filter(col => col.key !== 'stage'), // Stage will be added at the end
+                { key: 'investigationDeadline', label: 'Thời hạn ĐT' },
+                { key: 'totalDefendants', label: 'Tổng Bị can' },
+                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
+                { key: 'prosecutionTransferDate', label: 'Ngày chuyển TT' },
+                { key: 'trialTransferDate', label: 'Ngày chuyển XX' },
+                { key: 'stage', label: 'Giai đoạn' }, // Add stage at the end for 'all'
+            ];
+            break;
+        case 'investigation':
+            columns = [
+                ...baseCaseColumns.filter(col => col.key !== 'stage'),
+                { key: 'investigationDeadline', label: 'Thời hạn ĐT' },
+                { key: 'investigationRemaining', label: 'Thời hạn ĐT còn lại' },
+                { key: 'totalDefendants', label: 'Tổng Bị can' },
+                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
+                { key: 'shortestDetentionRemaining', label: 'Hạn Tạm giam ngắn nhất' },
+                { key: 'stage', label: 'Giai đoạn' },
+            ];
+            break;
+        case 'prosecution':
+            columns = [
+                ...baseCaseColumns.filter(col => col.key !== 'stage'),
+                // Đã bỏ cột 'Thời hạn ĐT (Ban đầu)'
+                { key: 'totalDefendants', label: 'Tổng Bị can' },
+                // Đã bỏ cột 'BP Ngăn chặn ngắn nhất'
+                { key: 'prosecutionTransferDate', label: 'Ngày chuyển TT' }, // NEW
+                { key: 'stage', label: 'Giai đoạn' },
+            ];
+            break;
+        case 'trial':
+            columns = [
+                ...baseCaseColumns.filter(col => col.key !== 'stage'),
+                // Đã bỏ cột 'Thời hạn ĐT (Ban đầu)'
+                { key: 'totalDefendants', label: 'Tổng Bị can' },
+                // Đã bỏ cột 'BP Ngăn chặn ngắn nhất'
+                { key: 'trialTransferDate', label: 'Ngày chuyển XX' }, // NEW
+                { key: 'stage', label: 'Giai đoạn' },
+            ];
+            break;
+        case 'expiring':
+            columns = [
+                ...baseCaseColumns.filter(col => col.key !== 'stage'),
+                { key: 'investigationDeadline', label: 'Thời hạn ĐT' },
+                { key: 'investigationRemaining', label: 'Thời hạn ĐT còn lại' },
+                { key: 'totalDefendants', label: 'Tổng Bị can' },
+                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
+                { key: 'shortestDetentionRemaining', label: 'Hạn Tạm giam ngắn nhất' },
+                { key: 'stage', label: 'Giai đoạn' },
+            ];
+            break;
+        default:
+            columns = baseCaseColumns;
+    }
+
+    casesToExport.forEach(caseItem => {
+        const row: any = {}; // Initialize an empty row
+
+        columns.forEach(col => { // Iterate through the selected columns for this tab
+            switch (col.key) {
+                case 'caseName':
+                    row[col.key] = caseItem.name;
+                    break;
+                case 'defendantsList': // <--- THAY ĐỔI: Xử lý cột Bị can
+                    if (caseItem.defendants && caseItem.defendants.length > 0) {
+                        // Định dạng tên bị can: Bị can 1; Bị can 2; ...
+                        row[col.key] = caseItem.defendants.map((d, idx) => `Bị can ${idx + 1}: ${d.name}`).join('; ');
+                    } else {
+                        row[col.key] = 'Không có bị can';
+                    }
+                    break;
+                case 'caseCharges': // Giữ nguyên tội danh vụ án nếu nó vẫn cần ở đâu đó
+                    row[col.key] = caseItem.charges;
+                    break;
+                case 'prosecutor':
+                    row[col.key] = caseItem.prosecutor;
+                    break;
+                case 'caseNotes':
+                    row[col.key] = caseItem.notes;
+                    break;
+                case 'stage':
+                    row[col.key] = caseItem.stage;
+                    break;
+                case 'investigationDeadline':
+                    row[col.key] = caseItem.investigationDeadline;
+                    break;
+                case 'prosecutionTransferDate':
+                    row[col.key] = caseItem.prosecutionTransferDate || '';
+                    break;
+                case 'trialTransferDate':
+                    row[col.key] = caseItem.trialTransferDate || '';
+                    break;
+                case 'investigationRemaining':
+                    row[col.key] = `${getDaysRemaining(caseItem.investigationDeadline)} ngày`;
+                    break;
+                case 'totalDefendants':
+                    row[col.key] = caseItem.defendants.length > 0 ? `${caseItem.defendants.length} bị can` : '0 bị can';
+                    break;
+                case 'shortestDetention':
+                    const detainedDefsForShortestDetention = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+                    if (detainedDefsForShortestDetention.length > 0) {
+                        const shortestDays = Math.min(...detainedDefsForShortestDetention.map(d => getDaysRemaining(d.detentionDeadline!)));
+                        row[col.key] = `${shortestDays} ngày`;
+                    } else {
+                        row[col.key] = 'Không có';
+                    }
+                    break;
+                case 'shortestDetentionRemaining':
+                    const detainedDefsForShortestDetentionRemaining = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+                    if (detainedDefsForShortestDetentionRemaining.length > 0) {
+                        const shortestDays = Math.min(...detainedDefsForShortestDetentionRemaining.map(d => getDaysRemaining(d.detentionDeadline!)));
+                        row[col.key] = `${shortestDays} ngày`;
+                    } else {
+                        row[col.key] = 'Không có';
+                    }
+                    break;
+                // Add other case properties here if needed for specific columns
+                default:
+                    // If a column key doesn't match any specific case, try to get it directly from caseItem
+                    // This handles generic keys like 'id', 'createdAt', etc., if they were to be added.
+                    row[col.key] = (caseItem as any)[col.key] || '';
+            }
+        });
+
+        dataToExport.push(row);
+    });
+
+    return { data: dataToExport, columns };
+  };
+
   // Xử lý xuất Excel cho vụ án
   const handleExportCasesToExcel = () => {
     if (activeTab === 'statistics') {
@@ -268,9 +459,9 @@ const App: React.FC = () => {
       const { data: dataToExport, columns } = prepareCaseStatisticsForExcel(cases, statisticsFromDate, statisticsToDate);
       exportToExcel(dataToExport, columns, 'ThongKeVuAn');
     } else {
-      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết vụ án
-      const filteredCases = getCaseTableData(); 
-      const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases);
+      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết vụ án dựa trên tab hiện tại
+      const filteredCases = getCaseTableData(); // Lấy dữ liệu đã được lọc theo tìm kiếm/kiểm sát viên
+      const { data: dataToExport, columns } = prepareCaseDataForCurrentTabExport(filteredCases, activeTab); 
       exportToExcel(dataToExport, columns, 'DanhSachVuAn');
     }
   };
@@ -416,7 +607,18 @@ const App: React.FC = () => {
     if (activeSystem === 'reports') {
       switch (activeTab) {
         case 'add':
-          return <ReportForm onAddReport={addReport} onTransferToCase={addCase} prosecutors={prosecutors} />;
+          return (
+            <ReportForm 
+              onSubmit={(data, isEditing) => handleReportFormSubmit(data, isEditing)} // Cập nhật props
+              onTransferToCase={addCase} 
+              prosecutors={prosecutors} 
+              initialData={editingReport} // Truyền dữ liệu tin báo đang chỉnh sửa
+              onCancelEdit={() => { // Hàm hủy chỉnh sửa
+                setEditingReport(null);
+                setActiveTab('all'); // Chuyển về tab danh sách
+              }}
+            />
+          );
         case 'statistics':
           return (
             <>
@@ -472,6 +674,7 @@ const App: React.FC = () => {
                 onTransferStage={transferReportStage}
                 onUpdateReport={updateReport}
                 onTransferToCase={addCase}
+                onEditReport={handleEditReport} // Truyền hàm xử lý chỉnh sửa
               />
             </>
           );
@@ -479,7 +682,17 @@ const App: React.FC = () => {
     } else { // activeSystem === 'cases'
       switch (activeTab) {
         case 'add':
-          return <CaseForm onAddCase={addCase} prosecutors={prosecutors} />;
+          return (
+            <CaseForm 
+              onSubmit={(data, isEditing) => handleCaseFormSubmit(data, isEditing)} // Cập nhật props
+              prosecutors={prosecutors} 
+              initialData={editingCase} // Truyền dữ liệu vụ án đang chỉnh sửa
+              onCancelEdit={() => { // Hàm hủy chỉnh sửa
+                setEditingCase(null);
+                setActiveTab('all'); // Chuyển về tab danh sách
+              }}
+            />
+          );
         case 'statistics':
           return (
             <>
@@ -535,6 +748,7 @@ const App: React.FC = () => {
                 onDeleteCase={deleteCase}
                 onTransferStage={transferStage}
                 onUpdateCase={updateCase}
+                onEditCase={handleEditCase} // Truyền hàm xử lý chỉnh sửa
                 showWarnings={activeTab === 'expiring'}
               />
             </>

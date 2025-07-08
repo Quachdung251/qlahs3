@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2, CheckCircle, XCircle, PauseCircle, Download, Edit2, MoreHorizontal, Send } from 'lucide-react';
 import { Report, CaseFormData } from '../types';
 import { getCurrentDate, getDaysRemaining } from '../utils/dateUtils';
-import ReportEditModal from './ReportEditModal';
+// import ReportEditModal from './ReportEditModal'; // XÓA DÒNG NÀY: Modal chỉnh sửa sẽ được quản lý ở App.tsx
 
 interface ReportTableProps {
   reports: Report[];
@@ -15,6 +15,7 @@ interface ReportTableProps {
   onTransferStage: (reportId: string, newStage: Report['stage']) => void;
   onUpdateReport: (updatedReport: Report) => void;
   onTransferToCase: (caseData: CaseFormData) => void;
+  onEditReport: (reportItem: Report) => void; // <--- THÊM PROP NÀY: Hàm xử lý khi nhấn Sửa
 }
 
 const ReportTable: React.FC<ReportTableProps> = ({ 
@@ -23,11 +24,12 @@ const ReportTable: React.FC<ReportTableProps> = ({
   onDeleteReport, 
   onTransferStage,
   onUpdateReport,
-  onTransferToCase
+  onTransferToCase,
+  onEditReport // <--- NHẬN PROP MỚI
 }) => {
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [editingReport, setEditingReport] = useState<Report | null>(null);
+  // const [editingReport, setEditingReport] = useState<Report | null>(null); // XÓA DÒNG NÀY: State này sẽ được quản lý ở App.tsx
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
 
   const toggleExpanded = (reportId: string) => {
@@ -65,39 +67,6 @@ const ReportTable: React.FC<ReportTableProps> = ({
     onTransferStage(report.id, 'Khởi tố');
     alert('Tin báo đã được khởi tố và chuyển sang hệ thống quản lý vụ án!');
   };
-
-  // HÀM exportToExcel CŨ ĐÃ ĐƯỢC CHUYỂN LÊN App.tsx VÀ utils/excelExportUtils.ts
-  // const exportToExcel = () => {
-  //   if (reports.length === 0) {
-  //     alert('Không có dữ liệu để xuất');
-  //     return;
-  //   }
-
-  //   const headers = columns.filter(col => col.key !== 'actions').map(col => col.label);
-    
-  //   const csvRows = reports.map(report => {
-  //     return columns.filter(col => col.key !== 'actions').map(col => {
-  //       const value = report[col.key as keyof Report];
-  //       return value ? value.toString() : '';
-  //     });
-  //   });
-
-  //   const csvContent = [
-  //     headers.join('\t'),
-  //     ...csvRows.map(row => row.join('\t'))
-  //   ].join('\n');
-
-  //   const BOM = '\uFEFF';
-  //   const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
-  //   const link = document.createElement('a');
-  //   const url = URL.createObjectURL(blob);
-  //   link.setAttribute('href', url);
-  //   link.setAttribute('download', `danh-sach-tin-bao-${new Date().toISOString().split('T')[0]}.txt`);
-  //   link.style.visibility = 'hidden';
-  //   document.body.appendChild(link);
-  //   link.click();
-  //   document.body.removeChild(link);
-  // };
 
   const getStageActions = (report: Report) => {
     const actions = [];
@@ -202,9 +171,9 @@ const ReportTable: React.FC<ReportTableProps> = ({
         return (
           <div className="relative">
             <div className="flex items-center gap-1">
-              {/* Always show Edit button */}
+              {/* Always show Edit button, now calling onEditReport prop */}
               <button
-                onClick={() => setEditingReport(report)}
+                onClick={() => onEditReport(report)} // <--- THAY ĐỔI: Gọi onEditReport prop
                 className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
               >
                 <Edit2 size={12} />
@@ -256,19 +225,6 @@ const ReportTable: React.FC<ReportTableProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      {/* Nút Xuất Excel đã được di chuyển lên App.tsx, loại bỏ khỏi đây */}
-      {/* {reports.length > 0 && (
-        <div className="p-4 border-b border-gray-200">
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-          >
-            <Download size={16} />
-            Xuất Excel
-          </button>
-        </div>
-      )} */}
-
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
@@ -351,15 +307,6 @@ const ReportTable: React.FC<ReportTableProps> = ({
         <div className="text-center py-8 text-gray-500">
           Không có tin báo nào
         </div>
-      )}
-
-      {/* Edit Modal */}
-      {editingReport && (
-        <ReportEditModal
-          report={editingReport}
-          onSave={onUpdateReport}
-          onClose={() => setEditingReport(null)}
-        />
       )}
 
       {/* Confirmation Modal */}
