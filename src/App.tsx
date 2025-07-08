@@ -1,5 +1,3 @@
-Bị can)">
-```typescript
 import React, { useState, useMemo, useEffect } from 'react';
 import { Scale, FileText, LogOut, Users, Download, Cloud, Upload } from 'lucide-react'; // Thêm Cloud, Upload icon
 import TabNavigation from './components/TabNavigation';
