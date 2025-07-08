@@ -32,10 +32,13 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
+  // useEffect để lọc options dựa trên giá trị nhập vào
   useEffect(() => {
+    // Nếu giá trị rỗng, hiển thị tất cả options
     if (!value.trim()) {
       setFilteredOptions(options);
     } else {
+      // Lọc options dựa trên giá trị nhập vào (không phân biệt hoa thường)
       const filtered = options.filter(option =>
         option.label.toLowerCase().includes(value.toLowerCase()) ||
         option.value.toLowerCase().includes(value.toLowerCase()) ||
@@ -43,66 +46,85 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       );
       setFilteredOptions(filtered);
     }
+    // Reset highlightedIndex mỗi khi filteredOptions thay đổi
     setHighlightedIndex(-1);
-  }, [value, options]);
+  }, [value, options]); // Phụ thuộc vào value và options
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    onChange(newValue);
-    setIsOpen(true);
+    onChange(newValue); // Cập nhật giá trị lên component cha
+    setIsOpen(true); // Luôn mở danh sách khi người dùng nhập liệu
   };
 
   const handleOptionClick = (option: AutocompleteOption) => {
-    onChange(option.value);
-    setIsOpen(false);
-    inputRef.current?.blur();
+    onChange(option.value); // Cập nhật giá trị đã chọn
+    setIsOpen(false); // Đóng danh sách
+    inputRef.current?.blur(); // Ẩn bàn phím ảo trên di động và bỏ focus
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
+      // Nếu danh sách chưa mở, nhấn ArrowDown hoặc Enter sẽ mở danh sách
       if (e.key === 'ArrowDown' || e.key === 'Enter') {
         setIsOpen(true);
+        // Khi mở, nếu input rỗng, hiển thị tất cả options
+        if (!value.trim()) {
+          setFilteredOptions(options);
+        }
         return;
       }
     }
 
     switch (e.key) {
       case 'ArrowDown':
-        e.preventDefault();
+        e.preventDefault(); // Ngăn cuộn trang
         setHighlightedIndex(prev => 
-          prev < filteredOptions.length - 1 ? prev + 1 : 0
+          prev < filteredOptions.length - 1 ? prev + 1 : 0 // Di chuyển xuống, vòng lại đầu nếu cuối danh sách
         );
         break;
       case 'ArrowUp':
-        e.preventDefault();
+        e.preventDefault(); // Ngăn cuộn trang
         setHighlightedIndex(prev => 
-          prev > 0 ? prev - 1 : filteredOptions.length - 1
+          prev > 0 ? prev - 1 : filteredOptions.length - 1 // Di chuyển lên, vòng lại cuối nếu đầu danh sách
         );
         break;
       case 'Enter':
-        e.preventDefault();
+        e.preventDefault(); // Ngăn form submit
         if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
-          handleOptionClick(filteredOptions[highlightedIndex]);
+          handleOptionClick(filteredOptions[highlightedIndex]); // Chọn option đang được highlight
+        } else if (filteredOptions.length === 1 && value.toLowerCase() === filteredOptions[0].label.toLowerCase()) {
+          // Nếu chỉ có một lựa chọn và nó khớp hoàn toàn với giá trị nhập vào, chọn nó
+          handleOptionClick(filteredOptions[0]);
+        } else {
+          // Nếu không có option nào được highlight hoặc không khớp, đóng danh sách
+          setIsOpen(false);
+          inputRef.current?.blur();
         }
         break;
       case 'Escape':
-        setIsOpen(false);
-        setHighlightedIndex(-1);
-        inputRef.current?.blur();
+        setIsOpen(false); // Đóng danh sách
+        setHighlightedIndex(-1); // Reset highlight
+        inputRef.current?.blur(); // Bỏ focus
         break;
     }
   };
 
   const handleFocus = () => {
-    setIsOpen(true);
+    setIsOpen(true); // Mở danh sách khi input được focus
+    // Khi focus, hiển thị tất cả các tùy chọn ban đầu nếu input rỗng,
+    // hoặc giữ nguyên các tùy chọn đã lọc nếu có giá trị
+    if (!value.trim()) {
+      setFilteredOptions(options);
+    }
   };
 
   const handleBlur = (e: React.FocusEvent) => {
-    // Delay closing to allow option clicks
+    // Sử dụng setTimeout để cho phép sự kiện click trên option được kích hoạt trước khi đóng danh sách
     setTimeout(() => {
+      // Kiểm tra xem phần tử đang được focus có nằm trong danh sách gợi ý không
       if (!listRef.current?.contains(document.activeElement)) {
-        setIsOpen(false);
-        setHighlightedIndex(-1);
+        setIsOpen(false); // Đóng danh sách
+        setHighlightedIndex(-1); // Reset highlight
       }
     }, 150);
   };
@@ -139,7 +161,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
         >
           {filteredOptions.map((option, index) => (
             <li
-              key={`${option.value}-${index}`}
+              key={`${option.value}-${index}`} // Sử dụng value và index để đảm bảo key duy nhất
               onClick={() => handleOptionClick(option)}
               className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${
                 index === highlightedIndex ? 'bg-blue-50' : ''
