@@ -61,54 +61,54 @@ const Statistics: React.FC<StatisticsProps> = ({ cases }) => {
     };
   };
 
-  // Export to Excel function with proper formatting
-  const exportToExcel = () => {
-    const newStats = getNewCasesStats();
-    const processedStats = getProcessedCasesStats();
-    const stageStats = getStageStats();
+  // HÀM exportToExcel CŨ ĐÃ ĐƯỢC CHUYỂN LÊN App.tsx VÀ utils/excelExportUtils.ts
+  // const exportToExcel = () => {
+  //   const newStats = getNewCasesStats();
+  //   const processedStats = getProcessedCasesStats();
+  //   const stageStats = getStageStats();
 
-    // Create proper tab-separated content for Excel
-    const csvRows = [
-      ['BÁO CÁO THỐNG KÊ VỤ ÁN'],
-      [`Từ ngày: ${fromDate} - Đến ngày: ${toDate}`],
-      [''],
-      ['PHẦN I: VỤ ÁN/BỊ CAN MỚI NHẬN'],
-      ['Chỉ tiêu', 'Số vụ án', 'Số bị can'],
-      ['Mới nhận trong kỳ', newStats.cases.toString(), newStats.defendants.toString()],
-      [''],
-      ['PHẦN II: VỤ ÁN/BỊ CAN ĐÃ XỬ LÝ'],
-      ['Chỉ tiêu', 'Số vụ án', 'Số bị can'],
-      ['Tổng đã xử lý', processedStats.totalCases.toString(), processedStats.totalDefendants.toString()],
-      ['- Hoàn thành (đã xét xử)', processedStats.completed.toString(), filteredCases.filter(c => c.stage === 'Hoàn thành').reduce((total, c) => total + c.defendants.length, 0).toString()],
-      ['- Tạm đình chỉ', processedStats.suspended.toString(), filteredCases.filter(c => c.stage === 'Tạm đình chỉ').reduce((total, c) => total + c.defendants.length, 0).toString()],
-      ['- Đình chỉ', processedStats.discontinued.toString(), filteredCases.filter(c => c.stage === 'Đình chỉ').reduce((total, c) => total + c.defendants.length, 0).toString()],
-      ['- Chuyển đi', processedStats.transferred.toString(), filteredCases.filter(c => c.stage === 'Chuyển đi').reduce((total, c) => total + c.defendants.length, 0).toString()],
-      [''],
-      ['PHẦN III: PHÂN BỐ THEO GIAI ĐOẠN'],
-      ['Giai đoạn', 'Số vụ án'],
-      ['Điều tra', stageStats.investigation.toString()],
-      ['Truy tố', stageStats.prosecution.toString()],
-      ['Xét xử', stageStats.trial.toString()],
-      ['Hoàn thành', stageStats.completed.toString()],
-      ['Tạm đình chỉ', stageStats.suspended.toString()],
-      ['Đình chỉ', stageStats.discontinued.toString()],
-      ['Chuyển đi', stageStats.transferred.toString()]
-    ];
+  //   // Create proper tab-separated content for Excel
+  //   const csvRows = [
+  //     ['BÁO CÁO THỐNG KÊ VỤ ÁN'],
+  //     [`Từ ngày: ${fromDate} - Đến ngày: ${toDate}`],
+  //     [''],
+  //     ['PHẦN I: VỤ ÁN/BỊ CAN MỚI NHẬN'],
+  //     ['Chỉ tiêu', 'Số vụ án', 'Số bị can'],
+  //     ['Mới nhận trong kỳ', newStats.cases.toString(), newStats.defendants.toString()],
+  //     [''],
+  //     ['PHẦN II: VỤ ÁN/BỊ CAN ĐÃ XỬ LÝ'],
+  //     ['Chỉ tiêu', 'Số vụ án', 'Số bị can'],
+  //     ['Tổng đã xử lý', processedStats.totalCases.toString(), processedStats.totalDefendants.toString()],
+  //     ['- Hoàn thành (đã xét xử)', processedStats.completed.toString(), filteredCases.filter(c => c.stage === 'Hoàn thành').reduce((total, c) => total + c.defendants.length, 0).toString()],
+  //     ['- Tạm đình chỉ', processedStats.suspended.toString(), filteredCases.filter(c => c.stage === 'Tạm đình chỉ').reduce((total, c) => total + c.defendants.length, 0).toString()],
+  //     ['- Đình chỉ', processedStats.discontinued.toString(), filteredCases.filter(c => c.stage === 'Đình chỉ').reduce((total, c) => total + c.defendants.length, 0).toString()],
+  //     ['- Chuyển đi', processedStats.transferred.toString(), filteredCases.filter(c => c.stage === 'Chuyển đi').reduce((total, c) => total + c.defendants.length, 0).toString()],
+  //     [''],
+  //     ['PHẦN III: PHÂN BỐ THEO GIAI ĐOẠN'],
+  //     ['Giai đoạn', 'Số vụ án'],
+  //     ['Điều tra', stageStats.investigation.toString()],
+  //     ['Truy tố', stageStats.prosecution.toString()],
+  //     ['Xét xử', stageStats.trial.toString()],
+  //     ['Hoàn thành', stageStats.completed.toString()],
+  //     ['Tạm đình chỉ', stageStats.suspended.toString()],
+  //     ['Đình chỉ', stageStats.discontinued.toString()],
+  //     ['Chuyển đi', stageStats.transferred.toString()]
+  //   ];
 
-    const csvContent = csvRows.map(row => row.join('\t')).join('\n');
+  //   const csvContent = csvRows.map(row => row.join('\t')).join('\n');
 
-    // Add BOM for UTF-8
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `thong-ke-vu-an-${fromDate.replace(/\//g, '-')}-${toDate.replace(/\//g, '-')}.txt`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  //   // Add BOM for UTF-8
+  //   const BOM = '\uFEFF';
+  //   const blob = new Blob([BOM + csvContent], { type: 'text/plain;charset=utf-8;' });
+  //   const link = document.createElement('a');
+  //   const url = URL.createObjectURL(blob);
+  //   link.setAttribute('href', url);
+  //   link.setAttribute('download', `thong-ke-vu-an-${fromDate.replace(/\//g, '-')}-${toDate.replace(/\//g, '-')}.txt`);
+  //   link.style.visibility = 'hidden';
+  //   document.body.appendChild(link);
+  //   link.click();
+  //   document.body.removeChild(link);
+  // };
 
   const newStats = getNewCasesStats();
   const processedStats = getProcessedCasesStats();
@@ -138,13 +138,14 @@ const Statistics: React.FC<StatisticsProps> = ({ cases }) => {
           <BarChart3 className="text-blue-600" size={24} />
           Thống Kê Dữ Liệu
         </h2>
-        <button
+        {/* Nút Xuất Excel đã được di chuyển lên App.tsx, loại bỏ khỏi đây */}
+        {/* <button
           onClick={exportToExcel}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
         >
           <Download size={16} />
           Xuất Excel
-        </button>
+        </button> */}
       </div>
 
       {/* Date Range Selection */}
