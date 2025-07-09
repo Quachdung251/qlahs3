@@ -3,7 +3,7 @@ import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2 } from 'lucide-rea
 import { CaseFormData, Defendant, Case } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
-import DateInput from './DateInput'; // Đã sửa đường dẫn import
+import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
 import { Prosecutor } from '../api/prosecutors';
 
@@ -31,6 +31,8 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
     defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
   });
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // State để hiển thị lỗi
+
   // useEffect để cập nhật formData khi initialData thay đổi (ví dụ: khi chuyển từ thêm mới sang chỉnh sửa hoặc ngược lại)
   useEffect(() => {
     if (initialData) {
@@ -53,35 +55,40 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
       });
     }
+    setErrorMessage(null); // Xóa lỗi khi form reset/chuyển đổi
   }, [initialData]);
-
-  // --- ĐÃ BỎ CÁC useEffect TỰ ĐỘNG ĐIỀN TRỰC TIẾP Ở ĐÂY ---
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setErrorMessage(null); // Xóa thông báo lỗi cũ
+
     let finalCaseData = { ...formData };
 
     // Logic tự động điền Tên Vụ Án và Tội Danh Vụ Án khi submit, chỉ khi ở chế độ thêm mới và trường đang trống
     if (!initialData && formData.defendants.length > 0) {
       const firstDefendant = formData.defendants[0];
-      // const criminalCodeItem = criminalCodeData.find(item => formatCriminalCodeDisplay(item) === firstDefendant.charges);
-      // const crimeDescription = criminalCodeItem ? criminalCodeItem.title : 'Chưa xác định tội danh';
+      const criminalCodeItem = criminalCodeData.find(item => formatCriminalCodeDisplay(item) === firstDefendant.charges);
+      const crimeDescription = criminalCodeItem ? criminalCodeItem.title : '';
 
       // Tự động điền Tên Vụ Án nếu đang trống (chỉ lấy tên bị can và viết hoa)
       if (!finalCaseData.name.trim() && firstDefendant.name.trim()) {
         finalCaseData.name = firstDefendant.name.toUpperCase();
       }
 
-      // Tự động điền Tội Danh Vụ Án nếu đang trống (chỉ lấy từ charges của bị can, vì nó đã được format đúng)
+      // Tự động điền Tội Danh Vụ Án nếu đang trống (chỉ lấy từ charges của bị can, và thêm mô tả tội danh nếu có)
       if (!finalCaseData.charges.trim() && firstDefendant.charges.trim()) {
-        finalCaseData.charges = firstDefendant.charges;
+        // Kiểm tra để tránh lặp lại mô tả tội danh nếu nó đã có trong firstDefendant.charges
+        if (firstDefendant.charges.includes(crimeDescription) && crimeDescription !== '') {
+          finalCaseData.charges = firstDefendant.charges;
+        } else {
+          finalCaseData.charges = `${firstDefendant.charges}${crimeDescription ? ` - ${crimeDescription}` : ''}`;
+        }
       }
     }
 
     // Kiểm tra các trường bắt buộc sau khi đã xử lý tự động điền
     if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
-      alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên)');
+      setErrorMessage('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên)');
       return;
     }
     
@@ -126,8 +133,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       return defendant;
     });
     setFormData({ ...formData, defendants: updatedDefendants });
-
-    // Logic tự động cập nhật tội danh đã được chuyển lên handleSubmit, không cần ở đây nữa
   };
 
   // Prepare options for autocomplete
@@ -161,165 +166,177 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         )}
       </h2>
       
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Case Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <FileText size={16} className="inline mr-1" />
-              Tên Vụ Án {isEditing ? '' : <span className="text-gray-500 text-xs">(để trống sẽ tự động tạo từ tên bị can đầu tiên)</span>}
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Nhập tên vụ án"
-              // Đã loại bỏ thuộc tính required ở đây
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Shield size={16} className="inline mr-1" />
-              Tội Danh Vụ Án (Điều, Khoản) {isEditing ? '' : <span className="text-gray-500 text-xs">(tự động từ bị can số 1)</span>}
-            </label>
-            <AutocompleteInput
-              value={formData.charges}
-              onChange={(value) => setFormData({ ...formData, charges: value })}
-              options={criminalCodeOptions}
-              placeholder="Nhập hoặc tìm kiếm tội danh"
-              // Đã loại bỏ thuộc tính required ở đây
-              icon={<Shield size={16} />}
-            />
-          </div>
-          
-          <DateInput
-            value={formData.investigationDeadline}
-            onChange={(value) => setFormData({ ...formData, investigationDeadline: value })}
-            label="Thời Hạn Điều Tra"
-            required
-          />
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <User size={16} className="inline mr-1" />
-              Kiểm Sát Viên Phụ Trách
-            </label>
-            <AutocompleteInput
-              value={formData.prosecutor}
-              onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions}
-              placeholder="Nhập hoặc chọn kiểm sát viên"
-              required
-              icon={<User size={16} />}
-            />
-          </div>
-          
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <FileText size={16} className="inline mr-1" />
-              Ghi Chú
-            </label>
-            <textarea
-              value={formData.notes || ''}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Nhập ghi chú (tùy chọn)"
-              rows={3}
-            />
-          </div>
+      {errorMessage && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">Lỗi!</strong>
+          <span className="block sm:inline"> {errorMessage}</span>
         </div>
+      )}
 
-        {/* Defendants Section */}
-        <div className="border-t pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-gray-800">Thông Tin Bị Can</h3>
-            <button
-              type="button"
-              onClick={addDefendant}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              <Plus size={16} />
-              Thêm Bị Can
-            </button>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Toàn bộ form được chia làm 2 cột */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Case Information and Case Charges */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText size={16} className="inline mr-1" />
+                Tên Vụ Án {isEditing ? '' : <span className="text-gray-500 text-xs">(để trống sẽ tự động tạo từ tên bị can đầu tiên)</span>}
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Nhập tên vụ án"
+              />
+            </div>
+            
+            <DateInput
+              value={formData.investigationDeadline}
+              onChange={(value) => setFormData({ ...formData, investigationDeadline: value })}
+              label="Thời Hạn Điều Tra"
+              required
+            />
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText size={16} className="inline mr-1" />
+                Ghi Chú
+              </label>
+              <textarea
+                value={formData.notes || ''}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Nhập ghi chú (tùy chọn)"
+                rows={3}
+              />
+            </div>
+
+            {/* Moved "Tội Danh Vụ Án (Điều, Khoản)" to the left column */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Shield size={16} className="inline mr-1" />
+                Tội Danh Vụ Án (Điều, Khoản) {isEditing ? '' : <span className="text-gray-500 text-xs">(tự động từ bị can số 1)</span>}
+              </label>
+              <AutocompleteInput
+                value={formData.charges}
+                onChange={(value) => setFormData({ ...formData, charges: value })}
+                options={criminalCodeOptions}
+                placeholder="Nhập hoặc tìm kiếm tội danh"
+                icon={<Shield size={16} />}
+              />
+            </div>
           </div>
-          
-          {formData.defendants.map((defendant, index) => (
-            <div key={defendant.id || index} className="bg-gray-50 p-4 rounded-md mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-lg font-medium text-gray-700">
-                  Bị Can {index + 1} {index === 0 && !isEditing && <span className="text-sm text-blue-600">(tội danh sẽ tự động áp dụng cho vụ án)</span>}
-                </h4>
-                {formData.defendants.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeDefendant(index)}
-                    className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
-                  >
-                    <Minus size={14} />
-                    Xóa Bị Can Này
-                  </button>
-                )}
+
+          {/* Right Column: Prosecutor and Defendants Section */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <User size={16} className="inline mr-1" />
+                Kiểm Sát Viên Phụ Trách
+              </label>
+              <AutocompleteInput
+                value={formData.prosecutor}
+                onChange={(value) => setFormData({ ...formData, prosecutor: value })}
+                options={prosecutorOptions}
+                placeholder="Nhập hoặc chọn kiểm sát viên"
+                required
+                icon={<User size={16} />}
+              />
+            </div>
+
+            {/* Defendants Section - now inside the right column */}
+            <div className="border-t pt-6 mt-6"> 
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-800">Thông Tin Bị Can</h3>
+                <button
+                  type="button"
+                  onClick={addDefendant}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  <Plus size={16} />
+                  Thêm Bị Can
+                </button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tên Bị Can
-                  </label>
-                  <input
-                    type="text"
-                    value={defendant.name}
-                    onChange={(e) => updateDefendant(index, 'name', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+              {formData.defendants.map((defendant, index) => (
+                <div key={defendant.id || index} className="bg-gray-50 p-4 rounded-md mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-lg font-medium text-gray-700">
+                      Bị Can {index + 1} {index === 0 && !isEditing && <span className="text-sm text-blue-600">(tội danh sẽ tự động áp dụng cho vụ án)</span>}
+                    </h4>
+                    {formData.defendants.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeDefendant(index)}
+                        className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+                      >
+                        <Minus size={14} />
+                        Xóa Bị Can Này
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tên Bị Can
+                      </label>
+                      <input
+                        type="text"
+                        value={defendant.name}
+                        onChange={(e) => updateDefendant(index, 'name', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tội Danh Bị Can (Điều, Khoản)
+                      </label>
+                      <AutocompleteInput
+                        value={defendant.charges}
+                        onChange={(value) => updateDefendant(index, 'charges', value)}
+                        options={criminalCodeOptions}
+                        placeholder="Nhập hoặc tìm kiếm tội danh"
+                        required
+                        className="p-2"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Biện Pháp Ngăn Chặn
+                      </label>
+                      <select
+                        value={defendant.preventiveMeasure}
+                        onChange={(e) => updateDefendant(index, 'preventiveMeasure', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="Tại ngoại">Tại ngoại</option>
+                        <option value="Tạm giam">Tạm giam</option>
+                      </select>
+                    </div>
+                    
+                    {defendant.preventiveMeasure === 'Tạm giam' && (
+                      <DateInput
+                        value={defendant.detentionDeadline || ''}
+                        onChange={(value) => updateDefendant(index, 'detentionDeadline', value)}
+                        label="Thời Hạn Tạm Giam"
+                        required
+                        className="col-span-1"
+                      />
+                    )}
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tội Danh Bị Can (Điều, Khoản)
-                  </label>
-                  <AutocompleteInput
-                    value={defendant.charges}
-                    onChange={(value) => updateDefendant(index, 'charges', value)}
-                    options={criminalCodeOptions}
-                    placeholder="Nhập hoặc tìm kiếm tội danh"
-                    required
-                    className="p-2"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Biện Pháp Ngăn Chặn
-                  </label>
-                  <select
-                    value={defendant.preventiveMeasure}
-                    onChange={(e) => updateDefendant(index, 'preventiveMeasure', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="Tại ngoại">Tại ngoại</option>
-                    <option value="Tạm giam">Tạm giam</option>
-                  </select>
-                </div>
-                
-                {defendant.preventiveMeasure === 'Tạm giam' && (
-                  <DateInput
-                    value={defendant.detentionDeadline || ''}
-                    onChange={(value) => updateDefendant(index, 'detentionDeadline', value)}
-                    label="Thời Hạn Tạm Giam"
-                    required
-                    className="col-span-1"
-                  />
-                )}
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 mt-6">
           {isEditing && onCancelEdit && (
             <button
               type="button"
