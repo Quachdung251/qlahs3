@@ -189,7 +189,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
               onChange={(value) => setFormData({ ...formData, charges: value })}
               options={criminalCodeOptions}
               placeholder="Nhập hoặc tìm kiếm tội danh"
-              required
+              // Đã loại bỏ thuộc tính required ở đây
               icon={<Shield size={16} />}
             />
           </div>
