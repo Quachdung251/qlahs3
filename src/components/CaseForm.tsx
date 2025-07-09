@@ -79,8 +79,9 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       }
     }
 
+    // Kiểm tra các trường bắt buộc sau khi đã xử lý tự động điền
     if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
-      alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách.');
+      alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên)');
       return;
     }
     
@@ -174,7 +175,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Nhập tên vụ án"
-              required // Tên vụ án luôn bắt buộc
+              // Đã loại bỏ thuộc tính required ở đây
             />
           </div>
           
