@@ -176,7 +176,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Toàn bộ form được chia làm 2 cột */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Case Information */}
+          {/* Left Column: Case Information and Case Charges */}
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -212,10 +212,8 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                 rows={3}
               />
             </div>
-          </div>
 
-          {/* Right Column: Charges, Prosecutor, and Defendants Section */}
-          <div className="space-y-6">
+            {/* Moved "Tội Danh Vụ Án (Điều, Khoản)" to the left column */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Shield size={16} className="inline mr-1" />
@@ -229,7 +227,10 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                 icon={<Shield size={16} />}
               />
             </div>
-            
+          </div>
+
+          {/* Right Column: Prosecutor and Defendants Section */}
+          <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <User size={16} className="inline mr-1" />
