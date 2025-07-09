@@ -3,7 +3,7 @@ import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2 } from 'lucide-rea
 import { CaseFormData, Defendant, Case } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
-import DateInput from './DateInput';
+import DateInput from './Date/DateInput'; // Đảm bảo đường dẫn đúng nếu bạn đã thay đổi cấu trúc thư mục
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
 import { Prosecutor } from '../api/prosecutors';
 
@@ -55,49 +55,31 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
     }
   }, [initialData]);
 
-  // --- NEW: useEffect để tự động điền Tên Vụ Án từ bị can đầu tiên (live) ---
-  useEffect(() => {
-    // Chỉ tự động điền khi ở chế độ thêm mới và trường tên vụ án đang trống
-    if (!initialData && !formData.name.trim() && formData.defendants.length > 0) {
-      const firstDefendant = formData.defendants[0];
-      if (firstDefendant.name.trim()) {
-        const caseName = `${firstDefendant.name}${firstDefendant.charges.trim() ? ` - ${firstDefendant.charges}` : ''}`;
-        setFormData(prev => ({ ...prev, name: caseName }));
-      } else if (formData.name !== '') { // Nếu tên bị can bị xóa, xóa luôn tên vụ án nếu nó được tạo tự động
-        setFormData(prev => ({ ...prev, name: '' }));
-      }
-    }
-  }, [formData.defendants[0]?.name, formData.defendants[0]?.charges, initialData]); // Theo dõi tên và tội danh bị can đầu tiên
-
-  // --- NEW: useEffect để tự động điền Tội Danh Vụ Án từ bị can đầu tiên (live) ---
-  useEffect(() => {
-    // Chỉ tự động điền khi ở chế độ thêm mới và trường tội danh vụ án đang trống
-    if (!initialData && !formData.charges.trim() && formData.defendants.length > 0) {
-      const firstDefendant = formData.defendants[0];
-      if (firstDefendant.charges.trim()) {
-        setFormData(prev => ({ ...prev, charges: firstDefendant.charges }));
-      } else if (formData.charges !== '') { // Nếu tội danh bị can bị xóa, xóa luôn tội danh vụ án nếu nó được tạo tự động
-        setFormData(prev => ({ ...prev, charges: '' }));
-      }
-    }
-  }, [formData.defendants[0]?.charges, initialData]); // Theo dõi tội danh bị can đầu tiên
+  // --- ĐÃ BỎ CÁC useEffect TỰ ĐỘNG ĐIỀN TRỰC TIẾP Ở ĐÂY ---
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     let finalCaseData = { ...formData };
-    // Logic tự động điền đã được chuyển lên useEffect, nên không cần ở đây nữa
-    // if (!initialData && !formData.name.trim() && formData.defendants.length > 0 && formData.defendants[0].name.trim()) {
-    //   const firstDefendant = formData.defendants[0];
-    //   const caseName = `${firstDefendant.name} - ${firstDefendant.charges || 'Chưa xác định tội danh'}`;
-    //   finalCaseData.name = caseName;
-    // }
-    // if (!initialData && !formData.charges.trim() && formData.defendants.length > 0 && formData.defendants[0].charges.trim()) {
-    //   finalCaseData.charges = formData.defendants[0].charges;
-    // }
+
+    // Logic tự động điền Tên Vụ Án và Tội Danh Vụ Án khi submit, chỉ khi ở chế độ thêm mới và trường đang trống
+    if (!initialData && formData.defendants.length > 0) {
+      const firstDefendant = formData.defendants[0];
+      const criminalCodeItem = criminalCodeData.find(item => formatCriminalCodeDisplay(item) === firstDefendant.charges);
+      const crimeDescription = criminalCodeItem ? criminalCodeItem.title : 'Chưa xác định tội danh';
+
+      // Tự động điền Tên Vụ Án nếu đang trống
+      if (!finalCaseData.name.trim() && firstDefendant.name.trim()) {
+        finalCaseData.name = `${firstDefendant.name}${firstDefendant.charges.trim() ? ` - ${firstDefendant.charges} - ${crimeDescription}` : ''}`;
+      }
+
+      // Tự động điền Tội Danh Vụ Án nếu đang trống
+      if (!finalCaseData.charges.trim() && firstDefendant.charges.trim()) {
+        finalCaseData.charges = `${firstDefendant.charges} - ${crimeDescription}`;
+      }
+    }
 
     if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
-      // Thay thế alert bằng một thông báo tùy chỉnh hoặc modal
       alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách.');
       return;
     }
@@ -144,10 +126,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
     });
     setFormData({ ...formData, defendants: updatedDefendants });
 
-    // Logic tự động cập nhật tội danh đã được chuyển lên useEffect, không cần ở đây nữa
-    // if (!initialData && index === 0 && field === 'charges' && !formData.charges.trim()) {
-    //   setFormData(prev => ({ ...prev, charges: value, defendants: updatedDefendants }));
-    // }
+    // Logic tự động cập nhật tội danh đã được chuyển lên handleSubmit, không cần ở đây nữa
   };
 
   // Prepare options for autocomplete
