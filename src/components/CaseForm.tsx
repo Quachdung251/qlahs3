@@ -65,17 +65,17 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
     // Logic tự động điền Tên Vụ Án và Tội Danh Vụ Án khi submit, chỉ khi ở chế độ thêm mới và trường đang trống
     if (!initialData && formData.defendants.length > 0) {
       const firstDefendant = formData.defendants[0];
-      const criminalCodeItem = criminalCodeData.find(item => formatCriminalCodeDisplay(item) === firstDefendant.charges);
-      const crimeDescription = criminalCodeItem ? criminalCodeItem.title : 'Chưa xác định tội danh';
+      // const criminalCodeItem = criminalCodeData.find(item => formatCriminalCodeDisplay(item) === firstDefendant.charges);
+      // const crimeDescription = criminalCodeItem ? criminalCodeItem.title : 'Chưa xác định tội danh';
 
-      // Tự động điền Tên Vụ Án nếu đang trống
+      // Tự động điền Tên Vụ Án nếu đang trống (chỉ lấy tên bị can và viết hoa)
       if (!finalCaseData.name.trim() && firstDefendant.name.trim()) {
-        finalCaseData.name = `${firstDefendant.name}${firstDefendant.charges.trim() ? ` - ${firstDefendant.charges} - ${crimeDescription}` : ''}`;
+        finalCaseData.name = firstDefendant.name.toUpperCase();
       }
 
-      // Tự động điền Tội Danh Vụ Án nếu đang trống
+      // Tự động điền Tội Danh Vụ Án nếu đang trống (chỉ lấy từ charges của bị can, vì nó đã được format đúng)
       if (!finalCaseData.charges.trim() && firstDefendant.charges.trim()) {
-        finalCaseData.charges = `${firstDefendant.charges} - ${crimeDescription}`;
+        finalCaseData.charges = firstDefendant.charges;
       }
     }
 
