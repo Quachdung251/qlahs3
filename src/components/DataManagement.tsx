@@ -5,94 +5,86 @@ import { Plus, Trash2, Edit2, Save, X, Book, Users, Upload, Download } from 'luc
 
 // Import dữ liệu và interface cho Bộ luật Hình sự (vẫn cục bộ)
 import { criminalCodeData, CriminalCodeItem } from '../data/criminalCode';
-// Import các tiện ích IndexedDB
+// Import dbManager instance
 import { dbManager } from '../utils/indexedDB';
-import { useIndexedDB } from '../hooks/useIndexedDB';
 
-// Import các hàm và interface cho Kiểm sát viên từ Supabase API
-import {
-  fetchProsecutors,
-  addProsecutor,
-  updateProsecutor,
-  deleteProsecutor,
-  Prosecutor
-} from '../api/prosecutors';
+// Import hook useProsecutors
+import { useProsecutors } from '../hooks/useProsecutors';
+import { Prosecutor } from '../hooks/useProsecutors'; // Import Prosecutor interface từ hook
 
 // Import hook xác thực Supabase
 import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
 
+// Import DatabaseSchema từ indexedDB để sử dụng cho import/export
+import { DatabaseSchema } from '../utils/indexedDB';
+
 interface DataManagementProps {
-  // Các hàm này có thể được dùng để thông báo cho component cha
-  // về sự thay đổi của dữ liệu, nếu cần re-render hoặc cập nhật ở nơi khác.
   onUpdateCriminalCode: (data: CriminalCodeItem[]) => void;
   onUpdateProsecutors: (data: Prosecutor[]) => void;
-  currentUserId: string; // <--- THÊM PROP NÀY: ID của người dùng hiện tại
+  currentUserId: string;
 }
 
-const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, onUpdateProsecutors, currentUserId }) => { // Nhận prop currentUserId
+const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, onUpdateProsecutors, currentUserId }) => {
   const { user, loading: authLoading } = useSupabaseAuth(); // Lấy thông tin user Supabase
-  const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors' | 'backup'>('criminal');
-  const [criminalData, setCriminalData] = useState<CriminalCodeItem[]>(criminalCodeData);
+  // Sử dụng hook useProsecutors để quản lý dữ liệu Kiểm sát viên
+  const { 
+    prosecutors, 
+    addProsecutor, 
+    updateProsecutor, 
+    deleteProsecutor, 
+    loading: prosecutorsLoading, // Đổi tên để tránh trùng với authLoading
+    error: prosecutorsError, 
+    fetchProsecutorsFromSupabase // Hàm để fetch lại từ Supabase
+  } = useProsecutors(); 
 
-  // Khởi tạo prosecutorData là mảng rỗng, dữ liệu sẽ được tải từ Supabase
-  const [prosecutorData, setProsecutorData] = useState<Prosecutor[]>([]);
+  const [activeSection, setActiveSection] = useState<'criminal' | 'prosecutors' | 'backup'>('criminal');
+  const [criminalData, setCriminalData] = useState<CriminalCodeItem[]>([]); // Sẽ tải từ IndexedDB
+  
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<any>(null); // Có thể là CriminalCodeItem hoặc Prosecutor
   const [bulkImportText, setBulkImportText] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
-  const [prosecutorLoading, setProsecutorLoading] = useState(true); // Trạng thái loading riêng cho Kiểm sát viên
-
-  const { exportData, importData } = useIndexedDB();
-
+  
   // useEffect để tải dữ liệu Bộ luật Hình sự từ IndexedDB khi component mount
   useEffect(() => {
     const loadCriminalData = async () => {
       try {
+        // Đảm bảo dbManager đã được khởi tạo
+        if (!dbManager.isInitialized()) {
+          await dbManager.init();
+        }
         const savedCriminalCode = await dbManager.loadData<CriminalCodeItem>('criminalCode');
         if (savedCriminalCode.length > 0) {
           setCriminalData(savedCriminalCode);
+        } else {
+          // Nếu chưa có trong IndexedDB, dùng dữ liệu mặc định và lưu vào DB
+          setCriminalData(criminalCodeData);
+          await dbManager.saveData('criminalCode', criminalCodeData);
         }
       } catch (error) {
         console.error('Failed to load criminal code data from IndexedDB:', error);
+        setCriminalData(criminalCodeData); // Fallback to default if load fails
       }
     };
     loadCriminalData();
-  }, []); // Chạy một lần khi component mount
+  }, []);
 
   // useEffect để lưu dữ liệu Bộ luật Hình sự vào IndexedDB khi có thay đổi
   useEffect(() => {
     const saveCriminalData = async () => {
       try {
-        await dbManager.saveData('criminalCode', criminalData);
+        if (dbManager.isInitialized()) { // Chỉ lưu khi DB đã khởi tạo
+          await dbManager.saveData('criminalCode', criminalData);
+        }
       } catch (error) {
         console.error('Failed to save criminal code data to IndexedDB:', error);
       }
     };
     saveCriminalData();
-  }, [criminalData]); // Chạy khi criminalData thay đổi
+  }, [criminalData]);
 
-  // useEffect để tải dữ liệu Kiểm sát viên từ Supabase
-  useEffect(() => {
-    const loadProsecutorsFromSupabase = async () => {
-      // Chỉ tải dữ liệu nếu người dùng đã được xác định và không còn trong trạng thái loading của auth
-      if (!authLoading) {
-        setProsecutorLoading(true); // Bắt đầu loading
-        if (user && currentUserId) { // <--- THÊM KIỂM TRA currentUserId
-          const data = await fetchProsecutors(); // RLS sẽ tự động lọc dữ liệu của user hiện tại
-          setProsecutorData(data);
-        } else {
-          // Nếu không có người dùng đăng nhập hoặc currentUserId không có, xóa dữ liệu Kiểm sát viên hiện có
-          setProsecutorData([]);
-          console.log("No user logged in or currentUserId is missing, cannot fetch prosecutors data from Supabase.");
-        }
-        setProsecutorLoading(false); // Kết thúc loading
-      }
-    };
-    loadProsecutorsFromSupabase();
-  }, [user, authLoading, currentUserId]); // <--- THÊM currentUserId VÀO DEPENDENCY ARRAY
-
-  // Bulk Import for Criminal Code (vẫn giữ nguyên logic IndexedDB)
-  const processBulkImport = () => {
+  // Bulk Import for Criminal Code
+  const processBulkImport = async () => {
     const lines = bulkImportText.split('\n').filter(line => line.trim());
     const newCodes: CriminalCodeItem[] = [];
 
@@ -104,6 +96,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
           const article = parts[0].trim();
           const title = parts[1].trim();
 
+          // Kiểm tra xem điều luật đã tồn tại chưa
           const exists = criminalData.some(code => code.article === article);
           if (!exists) {
             newCodes.push({
@@ -119,16 +112,16 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     if (newCodes.length > 0) {
       const updated = [...criminalData, ...newCodes];
       setCriminalData(updated);
-      onUpdateCriminalCode(updated);
+      onUpdateCriminalCode(updated); // Notify parent component
       setBulkImportText('');
       setShowBulkImport(false);
-      alert(`Đã thêm ${newCodes.length} điều luật mới vào IndexedDB!`);
+      alert(`Đã thêm ${newCodes.length} điều luật mới.`);
     } else {
       alert('Không có dữ liệu hợp lệ để thêm hoặc tất cả đã tồn tại.');
     }
   };
 
-  // Criminal Code Management (vẫn giữ nguyên logic IndexedDB)
+  // Criminal Code Management
   const addCriminalCode = () => {
     const newCode: CriminalCodeItem = {
       article: '',
@@ -155,87 +148,89 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
   };
 
   const deleteCriminalCode = (article: string) => {
-    const updated = criminalData.filter(code => code.article !== article);
-    setCriminalData(updated);
-    onUpdateCriminalCode(updated);
+    if (window.confirm('Bạn có chắc chắn muốn xóa điều luật này?')) {
+      const updated = criminalData.filter(code => code.article !== article);
+      setCriminalData(updated);
+      onUpdateCriminalCode(updated);
+    }
   };
 
-  // Prosecutor Management (Đã thay đổi để sử dụng Supabase)
+  // Prosecutor Management (Sử dụng useProsecutors hook)
   const handleAddProsecutor = () => {
-    if (!user || !currentUserId) { // <--- THÊM KIỂM TRA currentUserId
+    if (!user) {
       alert('Vui lòng đăng nhập để thêm Kiểm sát viên.');
       return;
     }
-    // Đặt newItem để hiển thị form thêm mới
     setNewItem({ name: '', title: 'Kiểm sát viên', department: '' });
   };
 
   const saveOrUpdateProsecutor = async (item: Prosecutor, isNew: boolean = false) => {
-    if (!user || !currentUserId) { // <--- THÊM KIỂM TRA currentUserId
+    if (!user) {
       alert('Bạn cần đăng nhập để thực hiện thao tác này.');
       return;
     }
 
     if (isNew) {
-      // <--- TRUYỀN currentUserId VÀO addProsecutor
-      const addedProsecutor = await addProsecutor(item, currentUserId);
-      if (addedProsecutor) {
+      const { success, error } = await addProsecutor(item);
+      if (success) {
         alert('Thêm Kiểm sát viên thành công!');
-        setNewItem(null); // Đóng form thêm mới
-        setEditingId(null); // Đảm bảo không có item nào đang được chỉnh sửa
-        const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
-        setProsecutorData(updatedData);
-        onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
+        setNewItem(null);
+        setEditingId(null);
+        // useProsecutors hook đã tự động cập nhật state và IndexedDB
+        // onUpdateProsecutors(prosecutors); // prosecutors đã được cập nhật bởi hook
       } else {
-        alert('Lỗi khi thêm Kiểm sát viên.'); // Thông báo lỗi chung, chi tiết hơn đã có trong console
+        alert(`Lỗi khi thêm Kiểm sát viên: ${error}`);
       }
     } else {
-      // Logic cho việc UPDATE
-      // Đảm bảo item.id tồn tại khi cập nhật
       if (!item.id) {
           alert('Không tìm thấy ID Kiểm sát viên để cập nhật.');
           return;
       }
-      // <--- TRUYỀN currentUserId VÀO updateProsecutor
-      const updatedProsecutor = await updateProsecutor(item.id, { name: item.name, title: item.title, department: item.department }, currentUserId);
-      if (updatedProsecutor) {
+      const { success, error } = await updateProsecutor(item);
+      if (success) {
         alert('Cập nhật Kiểm sát viên thành công!');
         setEditingId(null);
-        const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
-        setProsecutorData(updatedData);
-        onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
+        // useProsecutors hook đã tự động cập nhật state và IndexedDB
+        // onUpdateProsecutors(prosecutors);
       } else {
-        alert('Lỗi khi cập nhật Kiểm sát viên.'); // Thông báo lỗi chung
+        alert(`Lỗi khi cập nhật Kiểm sát viên: ${error}`);
       }
     }
   };
 
   const handleDeleteProsecutor = async (id: string) => {
-    if (!user || !currentUserId) { // <--- THÊM KIỂM TRA currentUserId
+    if (!user) {
       alert('Vui lòng đăng nhập để thực hiện thao tác này.');
       return;
     }
-    // Thay vì window.confirm, sử dụng modal tùy chỉnh nếu có
     if (window.confirm('Bạn có chắc chắn muốn xóa Kiểm sát viên này?')) {
-      // <--- TRUYỀN currentUserId VÀO deleteProsecutor
-      const success = await deleteProsecutor(id, currentUserId);
+      const { success, error } = await deleteProsecutor(id);
       if (success) {
         alert('Xóa Kiểm sát viên thành công!');
-        const updatedData = await fetchProsecutors(); // Tải lại dữ liệu từ Supabase
-        setProsecutorData(updatedData);
-        onUpdateProsecutors(updatedData); // Cập nhật dữ liệu cho component cha nếu cần
+        // useProsecutors hook đã tự động cập nhật state và IndexedDB
+        // onUpdateProsecutors(prosecutors);
       } else {
-        alert('Lỗi khi xóa Kiểm sát viên.'); // Thông báo lỗi chung
+        alert(`Lỗi khi xóa Kiểm sát viên: ${error}`);
       }
     }
   };
 
-  // Backup & Restore (vẫn giữ nguyên logic IndexedDB)
+  // Backup & Restore (Sử dụng dbManager)
   const handleExportData = async () => {
-    const success = await exportData();
-    if (success) {
+    try {
+      const allData = await dbManager.exportAllData();
+      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_data_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       alert('Dữ liệu đã được xuất thành công!');
-    } else {
+    } catch (error) {
+      console.error('Error exporting data:', error);
       alert('Có lỗi xảy ra khi xuất dữ liệu.');
     }
   };
@@ -244,13 +239,21 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const success = await importData(file);
-    if (success) {
-      alert('Dữ liệu đã được nhập thành công! Vui lòng tải lại trang.');
-      window.location.reload(); // Reload để tải lại dữ liệu từ IndexedDB sau khi import
-    } else {
-      alert('Có lỗi xảy ra khi nhập dữ liệu. Vui lòng kiểm tra định dạng file.');
-    }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importedData: DatabaseSchema = JSON.parse(content);
+        
+        await dbManager.importAllData(importedData);
+        alert('Dữ liệu đã được nhập thành công! Ứng dụng sẽ tải lại để áp dụng thay đổi.');
+        window.location.reload(); // Reload để tải lại dữ liệu từ IndexedDB sau khi import
+      } catch (error) {
+        console.error('Error importing data:', error);
+        alert('Có lỗi xảy ra khi nhập dữ liệu. Vui lòng kiểm tra định dạng file.');
+      }
+    };
+    reader.readAsText(file);
     event.target.value = ''; // Reset input file để có thể chọn lại cùng một file
   };
 
@@ -281,6 +284,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         <td className="px-4 py-2">
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={() => onSave(formData)}
               className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
             >
@@ -288,6 +292,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
               Lưu
             </button>
             <button
+              type="button"
               onClick={onCancel}
               className="flex items-center gap-1 px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
             >
@@ -317,7 +322,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
         </td>
         <td className="px-4 py-2">
           <select
-            value={formData.title}
+            value={formData.title || ''}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             className="w-full p-2 border rounded"
           >
@@ -334,21 +339,25 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
             className="w-full p-2 border rounded"
           >
             <option value="">Chọn phòng ban</option>
-            <option value="Phòng Hình sự">Phòng Hình sự</option>
-            <option value="Phòng Dân sự">Phòng Dân sự</option>
+            <option value="Ban Lãnh đạo">Ban Lãnh đạo</option>
+            <option value="Phòng Điều tra">Phòng Điều tra</option>
+            <option value="Phòng Truy tố">Phòng Truy tố</option>
+            <option value="Phòng Xét xử">Phòng Xét xử</option>
             <option value="Văn phòng">Văn phòng</option>
           </select>
         </td>
         <td className="px-4 py-2">
           <div className="flex gap-2">
             <button
-              onClick={() => onSave(formData, isNew)}
+              type="button"
+              onClick={() => saveOrUpdateProsecutor(formData, isNew)}
               className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
             >
               <Save size={14} />
               Lưu
             </button>
             <button
+              type="button"
               onClick={onCancel}
               className="flex items-center gap-1 px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
             >
@@ -540,6 +549,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
                       <td className="px-4 py-2">
                         <div className="flex gap-2">
                           <button
+                            type="button"
                             onClick={() => setEditingId(code.article)}
                             className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
                           >
@@ -547,6 +557,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
                             Sửa
                           </button>
                           <button
+                            type="button"
                             onClick={() => deleteCriminalCode(code.article)}
                             className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
                           >
@@ -578,8 +589,10 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
             </button>
           </div>
 
-          {prosecutorLoading ? (
+          {prosecutorsLoading ? (
             <div>Đang tải danh sách Kiểm sát viên...</div>
+          ) : prosecutorsError ? (
+            <div className="text-red-600">Lỗi: {prosecutorsError}. Vui lòng kiểm tra kết nối mạng hoặc thử lại.</div>
           ) : !user ? (
             <div>Vui lòng đăng nhập để xem và quản lý danh sách Kiểm sát viên của bạn.</div>
           ) : (
@@ -602,7 +615,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
                       isNew={true}
                     />
                   )}
-                  {prosecutorData.map((prosecutor) => (
+                  {prosecutors.map((prosecutor) => (
                     editingId === prosecutor.id ? (
                       <ProsecutorForm
                         key={prosecutor.id}
@@ -619,6 +632,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
                         <td className="px-4 py-2">
                           <div className="flex gap-2">
                             <button
+                              type="button"
                               onClick={() => setEditingId(prosecutor.id || null)}
                               className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
                             >
@@ -626,6 +640,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onUpdateCriminalCode, o
                               Sửa
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDeleteProsecutor(prosecutor.id!)}
                               className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
                             >

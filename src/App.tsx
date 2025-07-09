@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Scale, FileText, LogOut, Users, Download, Cloud, Upload } from 'lucide-react'; // Thêm Cloud, Upload icon
+import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X } from 'lucide-react'; // Thêm Cloud, Upload, X icon
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
 import CaseTable from './components/CaseTable';
@@ -10,13 +10,13 @@ import ReportForm from './components/ReportForm';
 import ReportTable from './components/ReportTable';
 import ReportStatistics from './components/ReportStatistics';
 import LoginForm from './components/LoginForm';
-import UserManagement from './components/UserManagement';
+import UserManagement from './components/UserManagement'; // Giữ lại nếu có kế hoạch sử dụng
 import { useCases } from './hooks/useCases';
 import { useReports } from './hooks/useReports';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
-import { useIndexedDB } from './hooks/useIndexedDB';
+import { useIndexedDB } from './hooks/useIndexedDB'; // Sử dụng hook này để kiểm tra isInitialized
 import { CriminalCodeItem } from './data/criminalCode';
-import { Prosecutor } from './api/prosecutors';
+import { Prosecutor } from './hooks/useProsecutors'; // Import Prosecutor interface từ hook useProsecutors
 import { useProsecutors } from './hooks/useProsecutors';
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
 import { Case, Report, CaseFormData, ReportFormData } from './types'; // Import Case, Report và CaseFormData, ReportFormData types
@@ -25,8 +25,8 @@ import { getCurrentDate, getDaysRemaining } from './utils/dateUtils'; // Import 
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
-  const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth(); // Lấy supabase client
-  const { isInitialized } = useIndexedDB();
+  const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth();
+  const { isInitialized } = useIndexedDB(); // Lấy trạng thái khởi tạo IndexedDB
   const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
   const [activeTab, setActiveTab] = useState('add');
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,7 +40,8 @@ const App: React.FC = () => {
   const [editingCase, setEditingCase] = useState<Case | null>(null);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
 
-  const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, setProsecutors } = useProsecutors();
+  // Sử dụng hook useProsecutors để quản lý danh sách kiểm sát viên
+  const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, overwriteAllProsecutors } = useProsecutors();
 
   const userKey = user?.id || 'default';
   // Cập nhật useCases và useReports để có hàm overwriteAll
@@ -54,6 +55,7 @@ const App: React.FC = () => {
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false); // State cho modal xác nhận khôi phục
+  const [dataToRestore, setDataToRestore] = useState<{ cases: Case[], reports: Report[] } | null>(null); // Dữ liệu tạm thời để khôi phục
 
   // Show loading while initializing or fetching prosecutors
   if (authLoading || !isInitialized || prosecutorsLoading) {
@@ -87,11 +89,13 @@ const App: React.FC = () => {
 
   const handleUpdateCriminalCode = (data: CriminalCodeItem[]) => {
     console.log('Updated criminal code data:', data);
+    // Không cần setCriminalCodeData ở đây vì DataManagement đã tự cập nhật IndexedDB
   };
 
   const handleUpdateProsecutors = (data: Prosecutor[]) => {
     console.log('Updated prosecutors data in App:', data);
-    setProsecutors(data);
+    // useProsecutors hook đã tự cập nhật state và IndexedDB, không cần setProsecutors ở đây
+    // setProsecutors(data); // Dòng này không còn cần thiết
   };
 
   // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
@@ -151,10 +155,6 @@ const App: React.FC = () => {
   // Case management columns
   const getCaseTableColumns = (tabId: string) => {
     const baseColumns = [
-      // Để cột 'Tên Vụ án' ngắn lại, bạn cần điều chỉnh CSS của component CaseTable.
-      // Cột này chỉ định key và label, không trực tiếp điều khiển độ rộng.
-      // Bạn có thể thêm class CSS vào <td> hoặc <th> trong CaseTable để giới hạn chiều rộng
-      // Ví dụ: <th className="w-1/5"> hoặc <td className="max-w-xs truncate">
       { key: 'name' as const, label: 'Tên Vụ án' },
     ];
 
@@ -165,7 +165,6 @@ const App: React.FC = () => {
           { 
             key: 'charges' as const, 
             label: 'Tội danh (VA)', 
-            // Sử dụng hàm render để chỉ hiển thị phần "Điều XXX"
             render: (caseItem: Case) => {
               const match = caseItem.charges.match(/Điều \d+/);
               return match ? match[0] : caseItem.charges;
@@ -259,7 +258,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Report management columns (không thay đổi theo yêu cầu)
+  // Report management columns
   const getReportTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Tin báo' },
@@ -350,13 +349,10 @@ const App: React.FC = () => {
   // Xử lý xuất Excel cho vụ án
   const handleExportCasesToExcel = () => {
     if (activeTab === 'statistics') {
-      // Nếu đang ở tab thống kê, xuất dữ liệu thống kê vụ án
       const { data: dataToExport, columns } = prepareCaseStatisticsForExcel(cases, statisticsFromDate, statisticsToDate);
       exportToExcel(dataToExport, columns, 'ThongKeVuAn');
     } else {
-      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết vụ án dựa trên tab hiện tại
-      const filteredCases = getCaseTableData(); // Lấy dữ liệu đã được lọc theo tìm kiếm/kiểm sát viên
-      // Truyền activeTab để prepareCaseDataForExcel có thể chọn cột phù hợp
+      const filteredCases = getCaseTableData();
       const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases, activeTab); 
       exportToExcel(dataToExport, columns, 'DanhSachVuAn');
     }
@@ -365,11 +361,9 @@ const App: React.FC = () => {
   // Xử lý xuất Excel cho tin báo
   const handleExportReportsToExcel = () => {
     if (activeTab === 'statistics') {
-      // Nếu đang ở tab thống kê, xuất dữ liệu thống kê tin báo
       const { data: dataToExport, columns } = prepareReportStatisticsForExcel(reports, statisticsFromDate, statisticsToDate);
       exportToExcel(dataToExport, columns, 'ThongKeTinBao');
     } else {
-      // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết tin báo
       const filteredReports = getReportTableData();
       const { data: dataToExport, columns } = prepareReportDataForExcel(filteredReports);
       exportToExcel(dataToExport, columns, 'DanhSachTinBao');
@@ -378,8 +372,8 @@ const App: React.FC = () => {
 
   // Hàm lưu dữ liệu lên Supabase
   const handleSaveDataToSupabase = async () => {
-    const currentUser = user; // Chụp giá trị user hiện tại
-    const currentSupabase = supabase; // Chụp giá trị supabase client hiện tại
+    const currentUser = user;
+    const currentSupabase = supabase;
 
     if (!currentUser || !currentSupabase) {
       setBackupMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
@@ -394,12 +388,11 @@ const App: React.FC = () => {
         reports: reports,
       };
 
-      // Sử dụng upsert để chỉ lưu 1 bản backup duy nhất cho mỗi user
-      const { error } = await currentSupabase // Sử dụng biến đã chụp
+      const { error } = await currentSupabase
         .from('user_backups')
         .upsert(
-          { user_id: currentUser.id, data: combinedData, created_at: new Date().toISOString() }, // Sử dụng biến đã chụp
-          { onConflict: 'user_id' } // Nếu có conflict với user_id, sẽ update bản ghi đó
+          { user_id: currentUser.id, data: combinedData, created_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
         );
 
       if (error) {
@@ -416,8 +409,8 @@ const App: React.FC = () => {
 
   // Hàm khôi phục dữ liệu từ Supabase
   const handleLoadDataFromSupabase = async () => {
-    const currentUser = user; // Chụp giá trị user hiện tại
-    const currentSupabase = supabase; // Chụp giá trị supabase client hiện tại
+    const currentUser = user;
+    const currentSupabase = supabase;
 
     if (!currentUser || !currentSupabase) {
       setRestoreMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
@@ -427,11 +420,11 @@ const App: React.FC = () => {
     setRestoreMessage(null);
 
     try {
-      const { data, error } = await currentSupabase // Sử dụng biến đã chụp
+      const { data, error } = await currentSupabase
         .from('user_backups')
         .select('data')
-        .eq('user_id', currentUser.id) // Sử dụng biến đã chụp
-        .single(); // Lấy bản ghi duy nhất
+        .eq('user_id', currentUser.id)
+        .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 là lỗi không tìm thấy bản ghi
         throw error;
@@ -442,7 +435,8 @@ const App: React.FC = () => {
         return;
       }
 
-      // Mở modal xác nhận thay vì dùng window.confirm
+      // Lưu dữ liệu vào state tạm thời và hiển thị modal xác nhận
+      setDataToRestore(data.data as { cases: Case[], reports: Report[] });
       setShowRestoreConfirmModal(true);
 
     } catch (error: any) {
@@ -459,34 +453,24 @@ const App: React.FC = () => {
     setRestoreLoading(true); // Bắt đầu lại trạng thái loading cho khôi phục
     setRestoreMessage(null);
 
-    const currentUser = user; // Chụp giá trị user hiện tại
-    const currentSupabase = supabase; // Chụp giá trị supabase client hiện tại
+    const currentUser = user;
+    const currentSupabase = supabase;
 
-    if (!currentUser || !currentSupabase) {
-      // Trường hợp này lý tưởng là không xảy ra nếu handleLoadDataFromSupabase đã xử lý đúng,
-      // nhưng đây là một lớp bảo vệ bổ sung.
-      setRestoreMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
-      setRestoreLoading(false); // Đảm bảo trạng thái loading được reset
+    if (!currentUser || !currentSupabase || !dataToRestore) {
+      setRestoreMessage('Lỗi: Dữ liệu hoặc thông tin người dùng không hợp lệ để khôi phục.');
+      setRestoreLoading(false);
       return;
     }
 
     try {
-      // Đọc lại dữ liệu từ Supabase để đảm bảo dữ liệu mới nhất
-      const { data, error } = await currentSupabase // Sử dụng biến đã chụp
-        .from('user_backups')
-        .select('data')
-        .eq('user_id', currentUser.id) // Sử dụng biến đã chụp
-        .single();
-
-      if (error || !data || !data.data) {
-        throw new Error(error?.message || 'Không tìm thấy dữ liệu để khôi phục.');
-      }
-
-      const restoredData = data.data as { cases: any[]; reports: any[] };
-      
       // Ghi đè dữ liệu vào IndexedDB thông qua các hooks
-      await overwriteAllCases(restoredData.cases);
-      await overwriteAllReports(restoredData.reports);
+      await overwriteAllCases(dataToRestore.cases);
+      await overwriteAllReports(dataToRestore.reports);
+      // Nếu có dữ liệu prosecutors trong backup, cũng cần khôi phục
+      // Tuy nhiên, cấu trúc backup hiện tại không bao gồm prosecutors.
+      // Nếu muốn backup prosecutors, cần sửa đổi handleSaveDataToSupabase để bao gồm nó.
+      // For now, we assume prosecutors are managed separately or always fetched from Supabase.
+      // await overwriteAllProsecutors(dataToRestore.prosecutors); // Nếu prosecutors có trong backup
 
       setRestoreMessage('Khôi phục dữ liệu thành công từ Supabase! Dữ liệu đã được cập nhật.');
       // Có thể cần refresh lại trang hoặc các state liên quan nếu dữ liệu không tự động cập nhật
@@ -496,6 +480,7 @@ const App: React.FC = () => {
       setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
     } finally {
       setRestoreLoading(false);
+      setDataToRestore(null); // Xóa dữ liệu tạm thời
     }
   };
 
@@ -505,20 +490,20 @@ const App: React.FC = () => {
         case 'add':
           return (
             <ReportForm 
-              onSubmit={(data, isEditing) => handleReportFormSubmit(data, isEditing)} // Cập nhật props
+              onSubmit={(data, isEditing) => handleReportFormSubmit(data, isEditing)}
               onTransferToCase={addCase} 
               prosecutors={prosecutors} 
-              initialData={editingReport} // Truyền dữ liệu tin báo đang chỉnh sửa
-              onCancelEdit={() => { // Hàm hủy chỉnh sửa
+              initialData={editingReport}
+              onCancelEdit={() => {
                 setEditingReport(null);
-                setActiveTab('all'); // Chuyển về tab danh sách
+                setActiveTab('all');
               }}
             />
           );
         case 'statistics':
           return (
             <>
-              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho thống kê tin báo */}
+              <div className="flex justify-end mb-4">
                 <button
                   onClick={handleExportReportsToExcel}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -547,7 +532,7 @@ const App: React.FC = () => {
         default: // Tabs khác (all, pending, expiring)
           return (
             <>
-              <div className="flex justify-end mb-4"> {/* Nút xuất Excel Tin Báo cho các tab danh sách */}
+              <div className="flex justify-end mb-4">
                 <button
                   onClick={handleExportReportsToExcel}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -570,7 +555,7 @@ const App: React.FC = () => {
                 onTransferStage={transferReportStage}
                 onUpdateReport={updateReport}
                 onTransferToCase={addCase}
-                onEditReport={handleEditReport} // Truyền hàm xử lý chỉnh sửa
+                onEditReport={handleEditReport}
               />
             </>
           );
@@ -580,19 +565,19 @@ const App: React.FC = () => {
         case 'add':
           return (
             <CaseForm 
-              onSubmit={(data, isEditing) => handleCaseFormSubmit(data, isEditing)} // Cập nhật props
+              onSubmit={(data, isEditing) => handleCaseFormSubmit(data, isEditing)}
               prosecutors={prosecutors} 
-              initialData={editingCase} // Truyền dữ liệu vụ án đang chỉnh sửa
-              onCancelEdit={() => { // Hàm hủy chỉnh sửa
+              initialData={editingCase}
+              onCancelEdit={() => {
                 setEditingCase(null);
-                setActiveTab('all'); // Chuyển về tab danh sách
+                setActiveTab('all');
               }}
             />
           );
         case 'statistics':
           return (
             <>
-              <div className="flex justify-end mb-4"> {/* Nút xuất Excel cho thống kê vụ án */}
+              <div className="flex justify-end mb-4">
                 <button
                   onClick={handleExportCasesToExcel}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -621,7 +606,6 @@ const App: React.FC = () => {
         default: // Tabs khác (all, investigation, prosecution, trial, expiring)
           return (
             <>
-              {/* Đảm bảo chỉ có MỘT nút Xuất Excel Vụ Án ở đây */}
               <div className="flex justify-end mb-4">
                 <button
                   onClick={handleExportCasesToExcel}
@@ -644,7 +628,7 @@ const App: React.FC = () => {
                 onDeleteCase={deleteCase}
                 onTransferStage={transferStage}
                 onUpdateCase={updateCase}
-                onEditCase={handleEditCase} // Truyền hàm xử lý chỉnh sửa
+                onEditCase={handleEditCase}
                 showWarnings={activeTab === 'expiring'}
               />
             </>
@@ -709,7 +693,6 @@ const App: React.FC = () => {
                 onClick={() => setShowBackupRestoreModal(true)}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
                 title="Lưu và Khôi phục dữ liệu từ Supabase"
-                // Disable nút nếu user hoặc supabase chưa sẵn sàng
                 disabled={!user || !supabase} 
               >
                 <Cloud size={16} />
@@ -729,7 +712,7 @@ const App: React.FC = () => {
       </header>
 
       {/* Navigation */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> {/* Thêm div để căn giữa */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <TabNavigation 
           activeTab={activeTab} 
           onTabChange={setActiveTab} 
@@ -754,6 +737,7 @@ const App: React.FC = () => {
             </p>
             <div className="flex justify-end gap-3">
               <button
+                type="button"
                 onClick={handleSaveDataToSupabase}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 disabled={backupLoading}
@@ -761,6 +745,7 @@ const App: React.FC = () => {
                 {backupLoading ? 'Đang lưu...' : <><Upload size={16} /> Lưu lên Cloud</>}
               </button>
               <button
+                type="button"
                 onClick={handleLoadDataFromSupabase}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
                 disabled={restoreLoading}
@@ -768,6 +753,7 @@ const App: React.FC = () => {
                 {restoreLoading ? 'Đang khôi phục...' : <><Download size={16} /> Khôi phục từ Cloud</>}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setShowBackupRestoreModal(false);
                   setBackupMessage(null);
@@ -792,29 +778,34 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Modal xác nhận khôi phục */}
+      {/* Modal Xác nhận Khôi phục */}
       {showRestoreConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận khôi phục dữ liệu</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận Khôi phục Dữ liệu</h3>
             <p className="text-sm text-gray-600 mb-6">
-              Bạn có chắc chắn muốn khôi phục dữ liệu từ Supabase? Thao tác này sẽ <span className="font-bold text-red-600">GHI ĐÈ</span> toàn bộ dữ liệu hiện có trên thiết bị của bạn và không thể hoàn tác.
+              Bạn có chắc chắn muốn khôi phục dữ liệu từ Cloud? Thao tác này sẽ GHI ĐÈ toàn bộ dữ liệu Vụ án và Tin báo hiện có trên thiết bị của bạn bằng dữ liệu từ bản sao lưu.
+              Bạn sẽ không thể hoàn tác thao tác này.
             </p>
             <div className="flex justify-end gap-3">
               <button
+                type="button"
+                onClick={confirmRestoreAction}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+              >
+                <Upload size={16} />
+                Xác nhận Ghi đè
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setShowRestoreConfirmModal(false);
-                  setRestoreMessage('Đã hủy khôi phục dữ liệu.');
+                  setDataToRestore(null); // Xóa dữ liệu tạm thời
+                  setRestoreMessage('Khôi phục đã bị hủy.');
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
               >
                 Hủy
-              </button>
-              <button
-                onClick={confirmRestoreAction}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Xác nhận khôi phục
               </button>
             </div>
           </div>
