@@ -3,7 +3,7 @@ import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2 } from 'lucide-rea
 import { CaseFormData, Defendant, Case } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
-import DateInput from './Date/DateInput'; // Đảm bảo đường dẫn đúng nếu bạn đã thay đổi cấu trúc thư mục
+import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
 import { Prosecutor } from '../api/prosecutors';
 
