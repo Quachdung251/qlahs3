@@ -660,6 +660,18 @@ const App: React.FC = () => {
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
               
+              {/* Nút Lưu/Khôi phục dữ liệu Supabase */}
+              <button
+                onClick={() => setShowBackupRestoreModal(true)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                title="Lưu và Khôi phục dữ liệu từ Supabase"
+                // Disable nút nếu user hoặc supabase chưa sẵn sàng
+                disabled={!user || !supabase} 
+              >
+                <Cloud size={16} />
+                Cloud
+              </button>
+
               <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -686,6 +698,84 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderMainContent()}
       </main>
+
+      {/* Modal Lưu/Khôi phục dữ liệu */}
+      {showBackupRestoreModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Lưu & Khôi phục dữ liệu (Supabase)</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Bạn có thể lưu dữ liệu hiện tại lên Supabase hoặc khôi phục dữ liệu đã lưu.
+              Lưu ý: Chỉ có một bản sao lưu duy nhất cho mỗi tài khoản. Khi bạn lưu, bản sao lưu cũ sẽ bị ghi đè.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleSaveDataToSupabase}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                disabled={backupLoading}
+              >
+                {backupLoading ? 'Đang lưu...' : <><Upload size={16} /> Lưu lên Cloud</>}
+              </button>
+              <button
+                onClick={handleLoadDataFromSupabase}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                disabled={restoreLoading}
+              >
+                {restoreLoading ? 'Đang khôi phục...' : <><Download size={16} /> Khôi phục từ Cloud</>}
+              </button>
+              <button
+                onClick={() => {
+                  setShowBackupRestoreModal(false);
+                  setBackupMessage(null);
+                  setRestoreMessage(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Đóng
+              </button>
+            </div>
+            {backupMessage && (
+              <p className={`mt-4 text-sm ${backupMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                {backupMessage}
+              </p>
+            )}
+            {restoreMessage && (
+              <p className={`mt-4 text-sm ${restoreMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                {restoreMessage}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận khôi phục */}
+      {showRestoreConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận khôi phục dữ liệu</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Bạn có chắc chắn muốn khôi phục dữ liệu từ Supabase? Thao tác này sẽ <span className="font-bold text-red-600">GHI ĐÈ</span> toàn bộ dữ liệu hiện có trên thiết bị của bạn và không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowRestoreConfirmModal(false);
+                  setRestoreMessage('Đã hủy khôi phục dữ liệu.');
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmRestoreAction}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Xác nhận khôi phục
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
