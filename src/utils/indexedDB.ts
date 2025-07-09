@@ -111,7 +111,7 @@ class IndexedDBManager {
         addRequest.onerror = () => reject(addRequest.error);
       });
     }
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => { // Ensure transaction completes
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });
