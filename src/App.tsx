@@ -18,9 +18,8 @@ import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './api/prosecutors';
 import { useProsecutors } from './hooks/useProsecutors';
-// Đã loại bỏ prepareCaseDataForExcel khỏi import vì nó không còn được sử dụng trực tiếp ở đây
-import { exportToExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
-import { Case, Report, CaseFormData } from './types'; // Import Case và Report types
+import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
+import { Case, Report, CaseFormData, ReportFormData } from './types'; // Import Case, Report và CaseFormData, ReportFormData types
 import { getCurrentDate, getDaysRemaining } from './utils/dateUtils'; // Import getCurrentDate và getDaysRemaining
 
 type SystemType = 'cases' | 'reports';
@@ -304,154 +303,6 @@ const App: React.FC = () => {
 
   const expiringSoonCount = activeSystem === 'cases' ? getExpiringSoonCases().length : getExpiringSoonReports().length;
 
-  // Helper function to prepare case data for Excel based on the active tab
-  const prepareCaseDataForCurrentTabExport = (casesToExport: Case[], currentTab: string) => {
-    let dataToExport: any[] = [];
-    let columns: { key: string; label: string }[] = [];
-
-    // Define base columns that are always present or common
-    const baseCaseColumns = [
-        { key: 'caseName', label: 'Tên Vụ án' },
-        { key: 'defendantsList', label: 'Bị can' }, // <--- THAY ĐỔI: Tội danh (VA) thành Bị can
-        { key: 'prosecutor', label: 'KSV' },
-        { key: 'caseNotes', label: 'Ghi chú Vụ án' },
-        { key: 'stage', label: 'Giai đoạn' },
-    ];
-
-    // Define columns specific to each tab for export
-    switch (currentTab) {
-        case 'all':
-            columns = [
-                ...baseCaseColumns.filter(col => col.key !== 'stage'), // Stage will be added at the end
-                { key: 'investigationDeadline', label: 'Thời hạn ĐT' },
-                { key: 'totalDefendants', label: 'Tổng Bị can' },
-                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
-                { key: 'prosecutionTransferDate', label: 'Ngày chuyển TT' },
-                { key: 'trialTransferDate', label: 'Ngày chuyển XX' },
-                { key: 'stage', label: 'Giai đoạn' }, // Add stage at the end for 'all'
-            ];
-            break;
-        case 'investigation':
-            columns = [
-                ...baseCaseColumns.filter(col => col.key !== 'stage'),
-                { key: 'investigationDeadline', label: 'Thời hạn ĐT' },
-                { key: 'investigationRemaining', label: 'Thời hạn ĐT còn lại' },
-                { key: 'totalDefendants', label: 'Tổng Bị can' },
-                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
-                { key: 'shortestDetentionRemaining', label: 'Hạn Tạm giam ngắn nhất' },
-                { key: 'stage', label: 'Giai đoạn' },
-            ];
-            break;
-        case 'prosecution':
-            columns = [
-                ...baseCaseColumns.filter(col => col.key !== 'stage'),
-                // Đã bỏ cột 'Thời hạn ĐT (Ban đầu)'
-                { key: 'totalDefendants', label: 'Tổng Bị can' },
-                // Đã bỏ cột 'BP Ngăn chặn ngắn nhất'
-                { key: 'prosecutionTransferDate', label: 'Ngày chuyển TT' }, // NEW
-                { key: 'stage', label: 'Giai đoạn' },
-            ];
-            break;
-        case 'trial':
-            columns = [
-                ...baseCaseColumns.filter(col => col.key !== 'stage'),
-                // Đã bỏ cột 'Thời hạn ĐT (Ban đầu)'
-                { key: 'totalDefendants', label: 'Tổng Bị can' },
-                // Đã bỏ cột 'BP Ngăn chặn ngắn nhất'
-                { key: 'trialTransferDate', label: 'Ngày chuyển XX' }, // NEW
-                { key: 'stage', label: 'Giai đoạn' },
-            ];
-            break;
-        case 'expiring':
-            columns = [
-                ...baseCaseColumns.filter(col => col.key !== 'stage'),
-                { key: 'investigationDeadline', label: 'Thời hạn ĐT' },
-                { key: 'investigationRemaining', label: 'Thời hạn ĐT còn lại' },
-                { key: 'totalDefendants', label: 'Tổng Bị can' },
-                { key: 'shortestDetention', label: 'BP Ngăn chặn ngắn nhất' },
-                { key: 'shortestDetentionRemaining', label: 'Hạn Tạm giam ngắn nhất' },
-                { key: 'stage', label: 'Giai đoạn' },
-            ];
-            break;
-        default:
-            columns = baseCaseColumns;
-    }
-
-    casesToExport.forEach(caseItem => {
-        const row: any = {}; // Initialize an empty row
-
-        columns.forEach(col => { // Iterate through the selected columns for this tab
-            switch (col.key) {
-                case 'caseName':
-                    row[col.key] = caseItem.name;
-                    break;
-                case 'defendantsList': // <--- THAY ĐỔI: Xử lý cột Bị can
-                    if (caseItem.defendants && caseItem.defendants.length > 0) {
-                        // Định dạng tên bị can: Bị can 1; Bị can 2; ...
-                        row[col.key] = caseItem.defendants.map((d, idx) => `Bị can ${idx + 1}: ${d.name}`).join('; ');
-                    } else {
-                        row[col.key] = 'Không có bị can';
-                    }
-                    break;
-                case 'caseCharges': // Giữ nguyên tội danh vụ án nếu nó vẫn cần ở đâu đó
-                    row[col.key] = caseItem.charges;
-                    break;
-                case 'prosecutor':
-                    row[col.key] = caseItem.prosecutor;
-                    break;
-                case 'caseNotes':
-                    row[col.key] = caseItem.notes;
-                    break;
-                case 'stage':
-                    row[col.key] = caseItem.stage;
-                    break;
-                case 'investigationDeadline':
-                    row[col.key] = caseItem.investigationDeadline;
-                    break;
-                case 'prosecutionTransferDate':
-                    row[col.key] = caseItem.prosecutionTransferDate || '';
-                    break;
-                case 'trialTransferDate':
-                    row[col.key] = caseItem.trialTransferDate || '';
-                    break;
-                case 'investigationRemaining':
-                    row[col.key] = `${getDaysRemaining(caseItem.investigationDeadline)} ngày`;
-                    break;
-                case 'totalDefendants':
-                    row[col.key] = caseItem.defendants.length > 0 ? `${caseItem.defendants.length} bị can` : '0 bị can';
-                    break;
-                case 'shortestDetention':
-                    const detainedDefsForShortestDetention = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-                    if (detainedDefsForShortestDetention.length > 0) {
-                        const shortestDays = Math.min(...detainedDefsForShortestDetention.map(d => getDaysRemaining(d.detentionDeadline!)));
-                        row[col.key] = `${shortestDays} ngày`;
-                    } else {
-                        row[col.key] = 'Không có';
-                    }
-                    break;
-                case 'shortestDetentionRemaining':
-                    const detainedDefsForShortestDetentionRemaining = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-                    if (detainedDefsForShortestDetentionRemaining.length > 0) {
-                        const shortestDays = Math.min(...detainedDefsForShortestDetentionRemaining.map(d => getDaysRemaining(d.detentionDeadline!)));
-                        row[col.key] = `${shortestDays} ngày`;
-                    } else {
-                        row[col.key] = 'Không có';
-                    }
-                    break;
-                // Add other case properties here if needed for specific columns
-                default:
-                    // If a column key doesn't match any specific case, try to get it directly from caseItem
-                    // This handles generic keys like 'id', 'createdAt', etc., if they were to be added.
-                    row[col.key] = (caseItem as any)[col.key] || '';
-            }
-        });
-
-        dataToExport.push(row);
-    });
-
-    return { data: dataToExport, columns };
-  };
-
   // Xử lý xuất Excel cho vụ án
   const handleExportCasesToExcel = () => {
     if (activeTab === 'statistics') {
@@ -461,7 +312,8 @@ const App: React.FC = () => {
     } else {
       // Nếu đang ở các tab bảng, xuất dữ liệu chi tiết vụ án dựa trên tab hiện tại
       const filteredCases = getCaseTableData(); // Lấy dữ liệu đã được lọc theo tìm kiếm/kiểm sát viên
-      const { data: dataToExport, columns } = prepareCaseDataForCurrentTabExport(filteredCases, activeTab); 
+      // Truyền activeTab để prepareCaseDataForExcel có thể chọn cột phù hợp
+      const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases, activeTab); 
       exportToExcel(dataToExport, columns, 'DanhSachVuAn');
     }
   };
@@ -808,18 +660,6 @@ const App: React.FC = () => {
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
               
-              {/* Nút Lưu/Khôi phục dữ liệu Supabase */}
-              <button
-                onClick={() => setShowBackupRestoreModal(true)}
-                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                title="Lưu và Khôi phục dữ liệu từ Supabase"
-                // Disable nút nếu user hoặc supabase chưa sẵn sàng
-                disabled={!user || !supabase} 
-              >
-                <Cloud size={16} />
-                Cloud
-              </button>
-
               <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -833,95 +673,19 @@ const App: React.FC = () => {
       </header>
 
       {/* Navigation */}
-      <TabNavigation 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
-        expiringSoonCount={expiringSoonCount}
-        systemType={activeSystem}
-      />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> {/* Thêm div để căn giữa */}
+        <TabNavigation 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          expiringSoonCount={expiringSoonCount}
+          systemType={activeSystem}
+        />
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderMainContent()}
       </main>
-
-      {/* Modal Lưu/Khôi phục dữ liệu */}
-      {showBackupRestoreModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Lưu & Khôi phục dữ liệu (Supabase)</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Bạn có thể lưu dữ liệu hiện tại lên Supabase hoặc khôi phục dữ liệu đã lưu.
-              Lưu ý: Chỉ có một bản sao lưu duy nhất cho mỗi tài khoản. Khi bạn lưu, bản sao lưu cũ sẽ bị ghi đè.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleSaveDataToSupabase}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                disabled={backupLoading}
-              >
-                {backupLoading ? 'Đang lưu...' : <><Upload size={16} /> Lưu lên Cloud</>}
-              </button>
-              <button
-                onClick={handleLoadDataFromSupabase}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
-                disabled={restoreLoading}
-              >
-                {restoreLoading ? 'Đang khôi phục...' : <><Download size={16} /> Khôi phục từ Cloud</>}
-              </button>
-              <button
-                onClick={() => {
-                  setShowBackupRestoreModal(false);
-                  setBackupMessage(null);
-                  setRestoreMessage(null);
-                }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Đóng
-              </button>
-            </div>
-            {backupMessage && (
-              <p className={`mt-4 text-sm ${backupMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
-                {backupMessage}
-              </p>
-            )}
-            {restoreMessage && (
-              <p className={`mt-4 text-sm ${restoreMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
-                {restoreMessage}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal xác nhận khôi phục */}
-      {showRestoreConfirmModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận khôi phục dữ liệu</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Bạn có chắc chắn muốn khôi phục dữ liệu từ Supabase? Thao tác này sẽ <span className="font-bold text-red-600">GHI ĐÈ</span> toàn bộ dữ liệu hiện có trên thiết bị của bạn và không thể hoàn tác.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowRestoreConfirmModal(false);
-                  setRestoreMessage('Đã hủy khôi phục dữ liệu.');
-                }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={confirmRestoreAction}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Xác nhận khôi phục
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
