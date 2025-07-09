@@ -3,7 +3,7 @@ import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2 } from 'lucide-rea
 import { CaseFormData, Defendant, Case } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
-import DateInput from './DateInput'; // Đã sửa đường dẫn import
+import DateInput from './DateInput';
 import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCode';
 import { Prosecutor } from '../api/prosecutors';
 
@@ -31,6 +31,8 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
     defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
   });
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // State để hiển thị lỗi
+
   // useEffect để cập nhật formData khi initialData thay đổi (ví dụ: khi chuyển từ thêm mới sang chỉnh sửa hoặc ngược lại)
   useEffect(() => {
     if (initialData) {
@@ -53,35 +55,40 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         defendants: [{ name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
       });
     }
+    setErrorMessage(null); // Xóa lỗi khi form reset/chuyển đổi
   }, [initialData]);
-
-  // --- ĐÃ BỎ CÁC useEffect TỰ ĐỘNG ĐIỀN TRỰC TIẾP Ở ĐÂY ---
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setErrorMessage(null); // Xóa thông báo lỗi cũ
+
     let finalCaseData = { ...formData };
 
     // Logic tự động điền Tên Vụ Án và Tội Danh Vụ Án khi submit, chỉ khi ở chế độ thêm mới và trường đang trống
     if (!initialData && formData.defendants.length > 0) {
       const firstDefendant = formData.defendants[0];
-      // const criminalCodeItem = criminalCodeData.find(item => formatCriminalCodeDisplay(item) === firstDefendant.charges);
-      // const crimeDescription = criminalCodeItem ? criminalCodeItem.title : 'Chưa xác định tội danh';
+      const criminalCodeItem = criminalCodeData.find(item => formatCriminalCodeDisplay(item) === firstDefendant.charges);
+      const crimeDescription = criminalCodeItem ? criminalCodeItem.title : '';
 
       // Tự động điền Tên Vụ Án nếu đang trống (chỉ lấy tên bị can và viết hoa)
       if (!finalCaseData.name.trim() && firstDefendant.name.trim()) {
         finalCaseData.name = firstDefendant.name.toUpperCase();
       }
 
-      // Tự động điền Tội Danh Vụ Án nếu đang trống (chỉ lấy từ charges của bị can, vì nó đã được format đúng)
+      // Tự động điền Tội Danh Vụ Án nếu đang trống (chỉ lấy từ charges của bị can, và thêm mô tả tội danh nếu có)
       if (!finalCaseData.charges.trim() && firstDefendant.charges.trim()) {
-        finalCaseData.charges = firstDefendant.charges;
+        // Kiểm tra để tránh lặp lại mô tả tội danh nếu nó đã có trong firstDefendant.charges
+        if (firstDefendant.charges.includes(crimeDescription) && crimeDescription !== '') {
+          finalCaseData.charges = firstDefendant.charges;
+        } else {
+          finalCaseData.charges = `${firstDefendant.charges}${crimeDescription ? ` - ${crimeDescription}` : ''}`;
+        }
       }
     }
 
     // Kiểm tra các trường bắt buộc sau khi đã xử lý tự động điền
     if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
-      alert('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên)');
+      setErrorMessage('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên)');
       return;
     }
     
@@ -126,8 +133,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       return defendant;
     });
     setFormData({ ...formData, defendants: updatedDefendants });
-
-    // Logic tự động cập nhật tội danh đã được chuyển lên handleSubmit, không cần ở đây nữa
   };
 
   // Prepare options for autocomplete
@@ -161,78 +166,89 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         )}
       </h2>
       
+      {errorMessage && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">Lỗi!</strong>
+          <span className="block sm:inline"> {errorMessage}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Case Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <FileText size={16} className="inline mr-1" />
-              Tên Vụ Án {isEditing ? '' : <span className="text-gray-500 text-xs">(để trống sẽ tự động tạo từ tên bị can đầu tiên)</span>}
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Nhập tên vụ án"
-              // Đã loại bỏ thuộc tính required ở đây
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Shield size={16} className="inline mr-1" />
-              Tội Danh Vụ Án (Điều, Khoản) {isEditing ? '' : <span className="text-gray-500 text-xs">(tự động từ bị can số 1)</span>}
-            </label>
-            <AutocompleteInput
-              value={formData.charges}
-              onChange={(value) => setFormData({ ...formData, charges: value })}
-              options={criminalCodeOptions}
-              placeholder="Nhập hoặc tìm kiếm tội danh"
-              // Đã loại bỏ thuộc tính required ở đây
-              icon={<Shield size={16} />}
-            />
-          </div>
-          
-          <DateInput
-            value={formData.investigationDeadline}
-            onChange={(value) => setFormData({ ...formData, investigationDeadline: value })}
-            label="Thời Hạn Điều Tra"
-            required
-          />
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <User size={16} className="inline mr-1" />
-              Kiểm Sát Viên Phụ Trách
-            </label>
-            <AutocompleteInput
-              value={formData.prosecutor}
-              onChange={(value) => setFormData({ ...formData, prosecutor: value })}
-              options={prosecutorOptions}
-              placeholder="Nhập hoặc chọn kiểm sát viên"
+        {/* Phần 1 & 2: Thông tin vụ án và Tội danh/KSV - Chia đôi */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Case Information (Red Box 1) */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText size={16} className="inline mr-1" />
+                Tên Vụ Án {isEditing ? '' : <span className="text-gray-500 text-xs">(để trống sẽ tự động tạo từ tên bị can đầu tiên)</span>}
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Nhập tên vụ án"
+              />
+            </div>
+            
+            <DateInput
+              value={formData.investigationDeadline}
+              onChange={(value) => setFormData({ ...formData, investigationDeadline: value })}
+              label="Thời Hạn Điều Tra"
               required
-              icon={<User size={16} />}
             />
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText size={16} className="inline mr-1" />
+                Ghi Chú
+              </label>
+              <textarea
+                value={formData.notes || ''}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Nhập ghi chú (tùy chọn)"
+                rows={3}
+              />
+            </div>
           </div>
-          
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <FileText size={16} className="inline mr-1" />
-              Ghi Chú
-            </label>
-            <textarea
-              value={formData.notes || ''}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Nhập ghi chú (tùy chọn)"
-              rows={3}
-            />
+
+          {/* Right Column: Charges, Prosecutor (Red Box 2) */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Shield size={16} className="inline mr-1" />
+                Tội Danh Vụ Án (Điều, Khoản) {isEditing ? '' : <span className="text-gray-500 text-xs">(tự động từ bị can số 1)</span>}
+              </label>
+              <AutocompleteInput
+                value={formData.charges}
+                onChange={(value) => setFormData({ ...formData, charges: value })}
+                options={criminalCodeOptions}
+                placeholder="Nhập hoặc tìm kiếm tội danh"
+                icon={<Shield size={16} />}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <User size={16} className="inline mr-1" />
+                Kiểm Sát Viên Phụ Trách
+              </label>
+              <AutocompleteInput
+                value={formData.prosecutor}
+                onChange={(value) => setFormData({ ...formData, prosecutor: value })}
+                options={prosecutorOptions}
+                placeholder="Nhập hoặc chọn kiểm sát viên"
+                required
+                icon={<User size={16} />}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Defendants Section */}
-        <div className="border-t pt-6">
+        {/* Phần 3: Defendants Section (Red Box 3) - Chiếm toàn bộ chiều rộng */}
+        <div className="border-t pt-6 mt-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold text-gray-800">Thông Tin Bị Can</h3>
             <button
@@ -319,7 +335,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
           ))}
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 mt-6">
           {isEditing && onCancelEdit && (
             <button
               type="button"
