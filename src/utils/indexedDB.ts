@@ -1,5 +1,7 @@
 // IndexedDB utilities for local data storage
 
+export const PROSECUTOR_STORE_NAME = 'prosecutors';
+
 export interface DatabaseSchema {
   cases: any[];
   reports: any[];
