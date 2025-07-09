@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase'; // Import supabase client
-import { PROSECUTOR_STORE_NAME, getAllData, overwriteStore, addData, putData, deleteData } from '../utils/indexedDB'; // Import IndexedDB functions
+import { dbManager } from '../utils/indexedDB'; // Import dbManager instance
 import { useSupabaseAuth } from './useSupabaseAuth'; // Import hook xác thực của bạn
 
 export interface Prosecutor {
@@ -34,7 +34,7 @@ export const useProsecutors = () => {
 
           // Update IndexedDB with the latest data from Supabase
           if (data) {
-            await overwriteStore(PROSECUTOR_STORE_NAME, data);
+            await dbManager.saveData('prosecutors', data); // Sử dụng dbManager.saveData
             setProsecutors(data as Prosecutor[]);
             setError(null); // Xóa lỗi nếu fetch thành công
             console.log('Đã tải kiểm sát viên từ Supabase và cập nhật IndexedDB.');
@@ -57,9 +57,9 @@ export const useProsecutors = () => {
   // Function to load from IndexedDB
   const loadProsecutorsFromIndexedDB = useCallback(async () => {
     try {
-      const localData = await getAllData(PROSECUTOR_STORE_NAME);
+      const localData = await dbManager.loadData<Prosecutor>('prosecutors'); // Sử dụng dbManager.loadData
       if (localData && localData.length > 0) {
-        setProsecutors(localData as Prosecutor[]);
+        setProsecutors(localData);
         console.log('Đã tải kiểm sát viên từ IndexedDB.');
       } else {
         console.log('Không có dữ liệu kiểm sát viên trong IndexedDB.');
@@ -93,7 +93,7 @@ export const useProsecutors = () => {
       // 1. Thêm vào IndexedDB trước để cập nhật UI ngay lập tức
       const tempId = `temp-${Date.now()}`; // ID tạm thời
       const prosecutorWithTempId = { ...newProsecutor, id: tempId };
-      await addData(PROSECUTOR_STORE_NAME, prosecutorWithTempId);
+      await dbManager.add('prosecutors', prosecutorWithTempId); // Sử dụng dbManager.add
       setProsecutors(prev => [...prev, prosecutorWithTempId]);
 
       // 2. Sau đó, insert vào Supabase
@@ -109,8 +109,8 @@ export const useProsecutors = () => {
 
       // 3. Nếu Supabase insert thành công, cập nhật IndexedDB với ID thực
       if (data) {
-        await deleteData(PROSECUTOR_STORE_NAME, tempId); // Xóa bản ghi tạm
-        await addData(PROSECUTOR_STORE_NAME, data as Prosecutor); // Thêm bản ghi với ID thực
+        await dbManager.delete('prosecutors', tempId); // Sử dụng dbManager.delete
+        await dbManager.add('prosecutors', data as Prosecutor); // Sử dụng dbManager.add
         setProsecutors(prev => prev.map(p => (p.id === tempId ? (data as Prosecutor) : p)));
       }
       setError(null);
@@ -132,7 +132,7 @@ export const useProsecutors = () => {
 
     try {
       // 1. Cập nhật IndexedDB trước
-      await putData(PROSECUTOR_STORE_NAME, updatedProsecutor);
+      await dbManager.put('prosecutors', updatedProsecutor); // Sử dụng dbManager.put
       setProsecutors(prev => prev.map(p => (p.id === updatedProsecutor.id ? updatedProsecutor : p)));
 
       // 2. Sau đó, cập nhật Supabase
@@ -164,7 +164,7 @@ export const useProsecutors = () => {
 
     try {
       // 1. Xóa khỏi IndexedDB trước
-      await deleteData(PROSECUTOR_STORE_NAME, id);
+      await dbManager.delete('prosecutors', id); // Sử dụng dbManager.delete
       setProsecutors(prev => prev.filter(p => p.id !== id));
 
       // 2. Sau đó, xóa khỏi Supabase
@@ -190,7 +190,7 @@ export const useProsecutors = () => {
 
   // Hàm này được expose để DataManagement có thể gọi khi cần ghi đè toàn bộ (ví dụ: import từ file)
   const overwriteAllProsecutors = async (newProsecutors: Prosecutor[]) => {
-    await overwriteStore(PROSECUTOR_STORE_NAME, newProsecutors);
+    await dbManager.saveData('prosecutors', newProsecutors); // Sử dụng dbManager.saveData
     setProsecutors(newProsecutors);
     // Sau khi ghi đè cục bộ, có thể cân nhắc đồng bộ lên Supabase nếu có mạng
     // Tuy nhiên, việc này phức tạp hơn (cần xử lý conflicts), nên tạm thời chỉ ghi đè cục bộ.
