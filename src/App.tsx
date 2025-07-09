@@ -151,6 +151,10 @@ const App: React.FC = () => {
   // Case management columns
   const getCaseTableColumns = (tabId: string) => {
     const baseColumns = [
+      // Để cột 'Tên Vụ án' ngắn lại, bạn cần điều chỉnh CSS của component CaseTable.
+      // Cột này chỉ định key và label, không trực tiếp điều khiển độ rộng.
+      // Bạn có thể thêm class CSS vào <td> hoặc <th> trong CaseTable để giới hạn chiều rộng
+      // Ví dụ: <th className="w-1/5"> hoặc <td className="max-w-xs truncate">
       { key: 'name' as const, label: 'Tên Vụ án' },
     ];
 
@@ -158,7 +162,15 @@ const App: React.FC = () => {
       case 'all':
         return [
           ...baseColumns,
-          { key: 'charges' as const, label: 'Tội danh (VA)' },
+          { 
+            key: 'charges' as const, 
+            label: 'Tội danh (VA)', 
+            // Sử dụng hàm render để chỉ hiển thị phần "Điều XXX"
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
           { key: 'investigationDeadline' as const, label: 'Thời hạn ĐT' },
           { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
           { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
@@ -172,6 +184,14 @@ const App: React.FC = () => {
       case 'investigation':
         return [
           ...baseColumns,
+          { 
+            key: 'charges' as const, 
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
           { key: 'investigationDeadline' as const, label: 'Thời hạn ĐT' },
           { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
           { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
@@ -182,6 +202,14 @@ const App: React.FC = () => {
       case 'prosecution':
         return [
           ...baseColumns,
+          { 
+            key: 'charges' as const, 
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
           { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
           { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
           { key: 'prosecutor' as const, label: 'KSV' },
@@ -192,6 +220,14 @@ const App: React.FC = () => {
       case 'trial':
         return [
           ...baseColumns,
+          { 
+            key: 'charges' as const, 
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
           { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
           { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
           { key: 'prosecutor' as const, label: 'KSV' },
@@ -202,6 +238,14 @@ const App: React.FC = () => {
       case 'expiring':
         return [
           ...baseColumns,
+          { 
+            key: 'charges' as const, 
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
           { key: 'stage' as const, label: 'Giai đoạn' },
           { key: 'investigationRemaining' as const, label: 'Thời hạn ĐT còn lại' },
           { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
@@ -215,7 +259,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Report management columns
+  // Report management columns (không thay đổi theo yêu cầu)
   const getReportTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Tin báo' },
