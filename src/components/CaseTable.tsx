@@ -326,29 +326,30 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
+                            {/* Adjusted grid for more compact display */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-1 gap-y-1 text-sm">
                               <div>
-                                <span className="font-medium">Tên:</span> {defendant.name}
+                                <span className="font-medium mr-1">Tên:</span> {defendant.name}
                               </div>
                               <div>
-                                <span className="font-medium">Tội danh:</span> {defendant.charges}
+                                <span className="font-medium mr-1">Tội danh:</span> {defendant.charges}
                               </div>
                               <div>
-                                <span className="font-medium">Biện pháp:</span> {defendant.preventiveMeasure}
+                                <span className="font-medium mr-1">Biện pháp:</span> {defendant.preventiveMeasure}
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1"> {/* Reduced gap here */}
                                   <div>
-                                    <span className="font-medium">Hạn tạm giam:</span> {defendant.detentionDeadline}
-                                    <span className={`ml-2 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                    <span className="font-medium mr-1">Hạn tạm giam:</span> {defendant.detentionDeadline}
+                                    <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}> {/* Reduced ml-2 to ml-1 */}
                                       ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                                     </span>
                                   </div>
                                   <button
                                     onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
-                                    className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors"
+                                    className="flex items-center gap-0.5 px-1 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors" // Reduced padding and gap
                                   >
-                                    <Clock size={12} />
+                                    <Clock size={10} /> {/* Smaller icon */}
                                     Gia hạn
                                   </button>
                                 </div>
