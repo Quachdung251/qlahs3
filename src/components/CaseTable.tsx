@@ -327,27 +327,27 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
                             {/* Adjusted grid for more compact display */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-1 gap-y-1 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-0.5 gap-y-0.5 text-sm"> {/* Giảm gap-x và gap-y */}
                               <div>
-                                <span className="font-medium mr-1">Tên:</span> {defendant.name}
+                                <span className="font-medium mr-0.5">Tên:</span> {defendant.name} {/* Giảm mr */}
                               </div>
                               <div>
-                                <span className="font-medium mr-1">Tội danh:</span> {defendant.charges}
+                                <span className="font-medium mr-0.5">Tội danh:</span> {defendant.charges} {/* Giảm mr */}
                               </div>
                               <div>
-                                <span className="font-medium mr-1">Biện pháp:</span> {defendant.preventiveMeasure}
+                                <span className="font-medium mr-0.5">Biện pháp:</span> {defendant.preventiveMeasure} {/* Giảm mr */}
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex items-center gap-1"> {/* Reduced gap here */}
+                                <div className="flex items-center gap-0.5"> {/* Giảm gap */}
                                   <div>
-                                    <span className="font-medium mr-1">Hạn tạm giam:</span> {defendant.detentionDeadline}
-                                    <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}> {/* Reduced ml-2 to ml-1 */}
+                                    <span className="font-medium mr-0.5">Hạn tạm giam:</span> {defendant.detentionDeadline} {/* Giảm mr */}
+                                    <span className={`ml-0.5 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}> {/* Giảm ml */}
                                       ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                                     </span>
                                   </div>
                                   <button
                                     onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
-                                    className="flex items-center gap-0.5 px-1 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors" // Reduced padding and gap
+                                    className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors" // Giảm padding và gap
                                   >
                                     <Clock size={10} /> {/* Smaller icon */}
                                     Gia hạn
