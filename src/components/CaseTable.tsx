@@ -32,7 +32,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   // const [editingCase, setEditingCase] = useState<Case | null>(null); // XÓA DÒNG NÀY: State này sẽ được quản lý ở App.tsx
-  const [expandedActions, setExpandedActions] = useState<Set<string>>(Set());
+  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set()); // ĐÃ SỬA: Set() thành new Set()
   const [notesCase, setNotesCase] = useState<Case | null>(null);
   const [extensionModal, setExtensionModal] = useState<{
     case: Case;
@@ -129,10 +129,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => onTransferStage(caseItem.id, 'Đình chỉ')}
+          onClick={() => setConfirmDelete(caseItem.id)} // Đã chuyển nút xóa vào đây
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
-          <StopCircle size={12} />
+          <Trash2 size={12} />
           Đình chỉ
         </button>
       );
@@ -247,13 +247,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       {action}
                     </div>
                   ))}
-                  <button
-                    onClick={() => setConfirmDelete(caseItem.id)}
-                    className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap w-full"
-                  >
-                    <Trash2 size={12} />
-                    Xóa
-                  </button>
+                  {/* Nút xóa đã được di chuyển vào getStageActions */}
                 </div>
               </div>
             )}
