@@ -12,6 +12,7 @@ export interface Case {
   charges: string; // Tội danh vụ án (Điều, Khoản)
   investigationDeadline: string; // dd/MM/yyyy format
   prosecutor: string;
+  supportingProsecutors?: string[]; // THÊM DÒNG NÀY: Mảng tên kiểm sát viên hỗ trợ
   notes?: string; // Ghi chú thay thế cho investigator
   stage: 'Điều tra' | 'Truy tố' | 'Xét xử' | 'Hoàn thành' | 'Tạm đình chỉ' | 'Đình chỉ' | 'Chuyển đi';
   prosecutionTransferDate?: string; // dd/MM/yyyy format
@@ -25,6 +26,7 @@ export interface CaseFormData {
   charges: string;
   investigationDeadline: string;
   prosecutor: string;
+  supportingProsecutors?: string[]; // THÊM DÒNG NÀY: Mảng tên kiểm sát viên hỗ trợ
   notes?: string;
   defendants: Omit<Defendant, 'id'>[];
 }
