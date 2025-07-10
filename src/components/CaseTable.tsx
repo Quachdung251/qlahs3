@@ -320,19 +320,19 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            {/* Sử dụng grid với 3 cột cố định và cho phép nội dung xuống dòng */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-2 gap-y-2 text-sm"> {/* Đã điều chỉnh gap-x */}
-                              <div className="col-span-1"> {/* Tên */}
+                            {/* Sử dụng flexbox với độ rộng cố định và cho phép nội dung xuống dòng */}
+                            <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
+                              <div className="w-[2cm] flex-shrink-0"> {/* Tên: 2cm */}
                                 <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                               </div>
-                              <div className="col-span-1"> {/* Tội danh */}
-                                <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span> {/* Đảm bảo xuống dòng */}
+                              <div className="w-[1cm] flex-shrink-0"> {/* Tội danh: 1cm */}
+                                <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
                               </div>
-                              <div className="col-span-1"> {/* Biện pháp */}
+                              <div className="w-[1cm] flex-shrink-0"> {/* Biện pháp: 1cm */}
                                 <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="col-span-1 md:col-span-2 lg:col-span-1 flex items-center"> {/* Hạn tạm giam - có thể chiếm nhiều cột hơn trên màn hình nhỏ */}
+                                <div className="flex-auto flex items-center"> {/* Hạn tạm giam - tự động co giãn */}
                                   <div>
                                     <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
                                     <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
