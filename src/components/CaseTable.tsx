@@ -321,7 +321,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
                             {/* Sử dụng grid với 3 cột cố định và cho phép nội dung xuống dòng */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm"> {/* Đã điều chỉnh gap */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-2 gap-y-2 text-sm"> {/* Đã điều chỉnh gap-x */}
                               <div className="col-span-1"> {/* Tên */}
                                 <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                               </div>
