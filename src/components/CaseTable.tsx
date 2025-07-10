@@ -326,30 +326,30 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            {/* Adjusted grid for more compact display */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-0.5 gap-y-0.5 text-sm"> {/* ĐÃ THAY ĐỔI: lg:grid-cols-4 thành lg:grid-cols-3 */}
+                            {/* Changed to flexbox for tighter control */}
+                            <div className="flex flex-wrap items-center text-sm gap-x-4 gap-y-2"> {/* Sử dụng flexbox và gap */}
                               <div>
-                                <span className="font-medium mr-0.5">Tên:</span> {defendant.name} {/* Giảm mr */}
+                                <span className="font-medium">Tên:</span> {defendant.name} 
                               </div>
                               <div>
-                                <span className="font-medium mr-0.5">Tội danh:</span> {defendant.charges} {/* Giảm mr */}
+                                <span className="font-medium">Tội danh:</span> {defendant.charges} 
                               </div>
                               <div>
-                                <span className="font-medium mr-0.5">Biện pháp:</span> {defendant.preventiveMeasure} {/* Giảm mr */}
+                                <span className="font-medium">Biện pháp:</span> {defendant.preventiveMeasure} 
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex items-center gap-0.5"> {/* Giảm gap */}
+                                <div className="flex items-center gap-1"> {/* Giữ nguyên flex cho phần này */}
                                   <div>
-                                    <span className="font-medium mr-0.5">Hạn tạm giam:</span> {defendant.detentionDeadline} {/* Giảm mr */}
-                                    <span className={`ml-0.5 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}> {/* Giảm ml */}
+                                    <span className="font-medium">Hạn tạm giam:</span> {defendant.detentionDeadline} 
+                                    <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                                       ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                                     </span>
                                   </div>
                                   <button
                                     onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
-                                    className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors" // Giảm padding và gap
+                                    className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors"
                                   >
-                                    <Clock size={10} /> {/* Smaller icon */}
+                                    <Clock size={10} /> 
                                     Gia hạn
                                   </button>
                                 </div>
