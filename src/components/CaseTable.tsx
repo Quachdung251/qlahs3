@@ -129,10 +129,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => onTransferStage(caseItem.id, 'Đình chỉ')}
+          onClick={() => setConfirmDelete(caseItem.id)} // Đã chuyển nút xóa vào đây
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
-          <StopCircle size={12} />
+          <Trash2 size={12} />
           Đình chỉ
         </button>
       );
@@ -247,13 +247,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       {action}
                     </div>
                   ))}
-                  <button
-                    onClick={() => setConfirmDelete(caseItem.id)}
-                    className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap w-full"
-                  >
-                    <Trash2 size={12} />
-                    Xóa
-                  </button>
+                  {/* Nút xóa đã được di chuyển vào getStageActions */}
                 </div>
               </div>
             )}
@@ -326,29 +320,30 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
-                              <div>
-                                <span className="font-medium">Tên:</span> {defendant.name}
+                            {/* Sử dụng flexbox với độ rộng cố định và cho phép nội dung xuống dòng */}
+                            <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
+                              <div className="w-40 flex-shrink-0"> {/* Tên: w-40 (2cm) */}
+                                <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                               </div>
-                              <div>
-                                <span className="font-medium">Tội danh:</span> {defendant.charges}
+                              <div className="w-80 flex-shrink-0"> {/* Tội danh: w-48 (1.5 lần 1cm) */}
+                                <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
                               </div>
-                              <div>
-                                <span className="font-medium">Biện pháp:</span> {defendant.preventiveMeasure}
+                              <div className="w-40 flex-shrink-0"> {/* Biện pháp: w-32 (1cm) */}
+                                <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex items-center gap-2">
+                                <div className="flex-auto flex items-center"> {/* Hạn tạm giam - tự động co giãn */}
                                   <div>
-                                    <span className="font-medium">Hạn tạm giam:</span> {defendant.detentionDeadline}
-                                    <span className={`ml-2 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                    <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
+                                    <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                                       ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                                     </span>
                                   </div>
                                   <button
                                     onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
-                                    className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors"
+                                    className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
                                   >
-                                    <Clock size={12} />
+                                    <Clock size={10} /> 
                                     Gia hạn
                                   </button>
                                 </div>
