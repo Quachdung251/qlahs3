@@ -322,13 +322,13 @@ const CaseTable: React.FC<CaseTableProps> = ({
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
                             {/* Sử dụng flexbox với độ rộng cố định và cho phép nội dung xuống dòng */}
                             <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
-                              <div className="w-[2cm] flex-shrink-0"> {/* Tên: 2cm */}
+                              <div className="w-40 flex-shrink-0"> {/* Tên: w-40 (2cm) */}
                                 <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                               </div>
-                              <div className="w-[1cm] flex-shrink-0"> {/* Tội danh: 1cm */}
+                              <div className="w-32 flex-shrink-0"> {/* Tội danh: w-32 (1cm) */}
                                 <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
                               </div>
-                              <div className="w-[1cm] flex-shrink-0"> {/* Biện pháp: 1cm */}
+                              <div className="w-32 flex-shrink-0"> {/* Biện pháp: w-32 (1cm) */}
                                 <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
