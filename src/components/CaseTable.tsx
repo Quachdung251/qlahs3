@@ -32,7 +32,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   // const [editingCase, setEditingCase] = useState<Case | null>(null); // XÓA DÒNG NÀY: State này sẽ được quản lý ở App.tsx
-  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
+  const [expandedActions, setExpandedActions] = useState<Set<string>>(Set());
   const [notesCase, setNotesCase] = useState<Case | null>(null);
   const [extensionModal, setExtensionModal] = useState<{
     case: Case;
@@ -326,28 +326,28 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            {/* Changed to flexbox for tighter control */}
-                            <div className="flex flex-wrap items-center text-sm gap-x-4 gap-y-2"> {/* Sử dụng flexbox và gap */}
-                              <div>
-                                <span className="font-medium">Tên:</span> {defendant.name} 
+                            {/* Sử dụng flexbox để tạo các "hộp vô hình" và kiểm soát khoảng cách */}
+                            <div className="flex flex-wrap text-sm justify-start items-start">
+                              <div className="flex-auto min-w-[200px] max-w-full mr-4 mb-2"> {/* Tên */}
+                                <span className="font-medium">Tên:</span> {defendant.name}
                               </div>
-                              <div>
-                                <span className="font-medium">Tội danh:</span> {defendant.charges} 
+                              <div className="flex-auto min-w-[200px] max-w-full mr-4 mb-2"> {/* Tội danh */}
+                                <span className="font-medium">Tội danh:</span> {defendant.charges}
                               </div>
-                              <div>
-                                <span className="font-medium">Biện pháp:</span> {defendant.preventiveMeasure} 
+                              <div className="flex-auto min-w-[200px] max-w-full mb-2"> {/* Biện pháp */}
+                                <span className="font-medium">Biện pháp:</span> {defendant.preventiveMeasure}
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex items-center gap-1"> {/* Giữ nguyên flex cho phần này */}
+                                <div className="flex-auto min-w-[250px] max-w-full mb-2 flex items-center"> {/* Hạn tạm giam */}
                                   <div>
-                                    <span className="font-medium">Hạn tạm giam:</span> {defendant.detentionDeadline} 
+                                    <span className="font-medium">Hạn tạm giam:</span> {defendant.detentionDeadline}
                                     <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                                       ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                                     </span>
                                   </div>
                                   <button
                                     onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
-                                    className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors"
+                                    className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
                                   >
                                     <Clock size={10} /> 
                                     Gia hạn
