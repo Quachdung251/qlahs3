@@ -325,10 +325,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
                               <div className="w-40 flex-shrink-0"> {/* Tên: w-40 (2cm) */}
                                 <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                               </div>
-                              <div className="w-48 flex-shrink-0"> {/* Tội danh: w-48 (1.5 lần 1cm) */}
+                              <div className="w-60 flex-shrink-0"> {/* Tội danh: w-48 (1.5 lần 1cm) */}
                                 <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
                               </div>
-                              <div className="w-32 flex-shrink-0"> {/* Biện pháp: w-32 (1cm) */}
+                              <div className="w-40 flex-shrink-0"> {/* Biện pháp: w-32 (1cm) */}
                                 <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
