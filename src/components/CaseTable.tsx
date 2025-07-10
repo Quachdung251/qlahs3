@@ -32,7 +32,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   // const [editingCase, setEditingCase] = useState<Case | null>(null); // XÓA DÒNG NÀY: State này sẽ được quản lý ở App.tsx
-  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set()); // ĐÃ SỬA: Set() thành new Set()
+  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
   const [notesCase, setNotesCase] = useState<Case | null>(null);
   const [extensionModal, setExtensionModal] = useState<{
     case: Case;
@@ -320,21 +320,21 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            {/* Sử dụng flexbox để tạo các "hộp vô hình" và kiểm soát khoảng cách */}
-                            <div className="flex flex-wrap text-sm justify-start items-start">
-                              <div className="flex-auto min-w-[200px] max-w-full mr-4 mb-2"> {/* Tên */}
-                                <span className="font-medium">Tên:</span> {defendant.name}
+                            {/* Sử dụng grid với 3 cột cố định và cho phép nội dung xuống dòng */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm"> {/* Đã điều chỉnh gap */}
+                              <div className="col-span-1"> {/* Tên */}
+                                <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                               </div>
-                              <div className="flex-auto min-w-[200px] max-w-full mr-4 mb-2"> {/* Tội danh */}
-                                <span className="font-medium">Tội danh:</span> {defendant.charges}
+                              <div className="col-span-1"> {/* Tội danh */}
+                                <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span> {/* Đảm bảo xuống dòng */}
                               </div>
-                              <div className="flex-auto min-w-[200px] max-w-full mb-2"> {/* Biện pháp */}
-                                <span className="font-medium">Biện pháp:</span> {defendant.preventiveMeasure}
+                              <div className="col-span-1"> {/* Biện pháp */}
+                                <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex-auto min-w-[250px] max-w-full mb-2 flex items-center"> {/* Hạn tạm giam */}
+                                <div className="col-span-1 md:col-span-2 lg:col-span-1 flex items-center"> {/* Hạn tạm giam - có thể chiếm nhiều cột hơn trên màn hình nhỏ */}
                                   <div>
-                                    <span className="font-medium">Hạn tạm giam:</span> {defendant.detentionDeadline}
+                                    <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
                                     <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                                       ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                                     </span>
