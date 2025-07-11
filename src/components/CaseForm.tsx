@@ -1,5 +1,6 @@
+// ./components/CaseForm.tsx
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2, UserPlus } from 'lucide-react'; // Thêm UserPlus icon
+import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2, UserPlus } from 'lucide-react';
 import { CaseFormData, Defendant, Case } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
@@ -15,30 +16,36 @@ interface CaseFormProps {
 }
 
 const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData, onCancelEdit }) => {
-  // Khởi tạo formData:
-  // - defendants: Mảng rỗng cho trường hợp thêm mới, hoặc map từ initialData
-  // - supportingProsecutors: Mảng rỗng cho trường hợp thêm mới, hoặc từ initialData
+  // Hàm helper để thêm số ngày vào ngày hiện tại
+  const addDaysToCurrentDate = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const [formData, setFormData] = useState<CaseFormData>(initialData ? {
     name: initialData.name,
     charges: initialData.charges,
     investigationDeadline: initialData.investigationDeadline,
     prosecutor: initialData.prosecutor,
-    supportingProsecutors: initialData.supportingProsecutors || [], // Khởi tạo từ initialData hoặc mảng rỗng
+    supportingProsecutors: initialData.supportingProsecutors || [],
     notes: initialData.notes,
-    defendants: initialData.defendants ? initialData.defendants.map(d => ({ ...d })) : [] // Đảm bảo defendants không null
+    defendants: initialData.defendants ? initialData.defendants.map(d => ({ ...d })) : []
   } : {
     name: '',
     charges: '',
     investigationDeadline: getCurrentDate(),
     prosecutor: '',
-    supportingProsecutors: [], // Mảng rỗng cho kiểm sát viên hỗ trợ khi thêm mới
+    supportingProsecutors: [],
     notes: '',
-    defendants: [] // Mảng rỗng cho bị can khi thêm mới
+    defendants: []
   });
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // State để hiển thị lỗi
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // useEffect để cập nhật formData khi initialData thay đổi
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -51,7 +58,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         defendants: initialData.defendants ? initialData.defendants.map(d => ({ ...d })) : []
       });
     } else {
-      // Reset form khi không có initialData (chế độ thêm mới)
       setFormData({
         name: '',
         charges: '',
@@ -62,12 +68,12 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         defendants: []
       });
     }
-    setErrorMessage(null); // Xóa lỗi khi form reset/chuyển đổi
+    setErrorMessage(null);
   }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null); // Xóa thông báo lỗi cũ
+    setErrorMessage(null);
 
     let finalCaseData = { ...formData };
 
@@ -98,9 +104,9 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       setErrorMessage('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên và vụ án chưa có tên/tội danh)');
       return;
     }
-    
+
     onSubmit(finalCaseData, !!initialData);
-    
+
     // Reset form chỉ khi ở chế độ thêm mới
     if (!initialData) {
       setFormData({
@@ -116,10 +122,23 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
   };
 
   const addDefendant = () => {
-    setFormData({
-      ...formData,
-      defendants: [...formData.defendants, { name: '', charges: '', preventiveMeasure: 'Tại ngoại' }]
-    });
+    // THÊM LOGIC TỰ ĐỘNG ĐIỀN
+    const defaultCharges = 'Chưa xác định'; // Giá trị mặc định cho tội danh
+    // Giá trị mặc định cho thời hạn tạm giam (ví dụ: 30 ngày kể từ hôm nay)
+    const defaultDetentionDeadline = addDaysToCurrentDate(30);
+
+    setFormData(prev => ({
+      ...prev,
+      defendants: [
+        ...prev.defendants,
+        {
+          name: '',
+          charges: defaultCharges, // Tự động điền tội danh
+          preventiveMeasure: 'Tại ngoại', // Mặc định là tại ngoại
+          detentionDeadline: defaultDetentionDeadline // Tự động điền hạn tạm giam (sẽ bị ẩn nếu biện pháp là tại ngoại)
+        }
+      ]
+    }));
   };
 
   const removeDefendant = (index: number) => {
@@ -135,6 +154,9 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         const updated = { ...defendant, [field]: value };
         if (field === 'preventiveMeasure' && value === 'Tại ngoại') {
           delete updated.detentionDeadline;
+        } else if (field === 'preventiveMeasure' && value === 'Tạm giam' && !updated.detentionDeadline) {
+          // Nếu chuyển sang tạm giam mà chưa có hạn, tự động điền hạn mặc định
+          updated.detentionDeadline = addDaysToCurrentDate(30);
         }
         return updated;
       }
@@ -147,7 +169,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
   const addSupportingProsecutor = () => {
     setFormData(prev => ({
       ...prev,
-      supportingProsecutors: [...(prev.supportingProsecutors || []), ''] // Thêm một chuỗi rỗng để người dùng nhập
+      supportingProsecutors: [...(prev.supportingProsecutors || []), '']
     }));
   };
 
@@ -196,7 +218,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
           </>
         )}
       </h2>
-      
+
       {errorMessage && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
           <strong className="font-bold">Lỗi!</strong>
@@ -205,9 +227,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Toàn bộ form được chia làm 2 cột */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Case Information and Case Charges */}
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -222,14 +242,14 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                 placeholder="Nhập tên vụ án"
               />
             </div>
-            
+
             <DateInput
               value={formData.investigationDeadline}
               onChange={(value) => setFormData({ ...formData, investigationDeadline: value })}
               label="Thời Hạn Điều Tra"
               required
             />
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <FileText size={16} className="inline mr-1" />
@@ -244,7 +264,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
               />
             </div>
 
-            {/* "Tội Danh Vụ Án (Điều, Khoản)" */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Shield size={16} className="inline mr-1" />
@@ -260,7 +279,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
             </div>
           </div>
 
-          {/* Right Column: Prosecutor and Defendants Section */}
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -277,7 +295,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
               />
             </div>
 
-            {/* Supporting Prosecutors Section */}
             <div className="border-t pt-6 mt-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-gray-800">Kiểm Sát Viên Hỗ Trợ</h3>
@@ -316,7 +333,6 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
               )}
             </div>
 
-            {/* Defendants Section - now inside the right column */}
             <div className="border-t pt-6 mt-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-gray-800">Thông Tin Bị Can</h3>
@@ -329,7 +345,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                   Thêm Bị Can
                 </button>
               </div>
-              
+
               {formData.defendants && formData.defendants.length > 0 ? (
                 formData.defendants.map((defendant, index) => (
                   <div key={defendant.id || index} className="bg-gray-50 p-4 rounded-md mb-4">
@@ -337,8 +353,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                       <h4 className="text-lg font-medium text-gray-700">
                         Bị Can {index + 1} {index === 0 && !isEditing && <span className="text-sm text-blue-600">(tội danh sẽ tự động áp dụng cho vụ án)</span>}
                       </h4>
-                      {/* Cho phép xóa bị can cuối cùng nếu có nhiều hơn 0 bị can */}
-                      {formData.defendants.length > 0 && ( 
+                      {formData.defendants.length > 0 && (
                         <button
                           type="button"
                           onClick={() => removeDefendant(index)}
@@ -349,7 +364,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                         </button>
                       )}
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -363,7 +378,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                           required
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Tội Danh Bị Can (Điều, Khoản)
@@ -377,7 +392,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                           className="p-2"
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Biện Pháp Ngăn Chặn
@@ -391,7 +406,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                           <option value="Tạm giam">Tạm giam</option>
                         </select>
                       </div>
-                      
+
                       {defendant.preventiveMeasure === 'Tạm giam' && (
                         <DateInput
                           value={defendant.detentionDeadline || ''}
