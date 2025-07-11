@@ -1,3 +1,4 @@
+// types.ts
 export interface Defendant {
   id: string;
   name: string;
@@ -19,6 +20,7 @@ export interface Case {
   trialTransferDate?: string; // dd/MM/yyyy format
   defendants: Defendant[];
   createdAt: string;
+  isImportant?: boolean; // THÊM DÒNG NÀY: Đánh dấu vụ án quan trọng
 }
 
 export interface CaseFormData {
