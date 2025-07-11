@@ -28,7 +28,7 @@ import QRCodeScannerModal from './components/QRCodeScannerModal';
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
-  const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth(); [cite: 192]
+const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth();
   const { isInitialized } = useIndexedDB();
   const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
   const [activeTab, setActiveTab] = useState('add');
