@@ -25,8 +25,8 @@ import QRCodeScannerModal from './components/QRCodeScannerModal';
 
 type SystemType = 'cases' | 'reports';
 
-// Tên kênh Broadcast Channel. PHẢI KHỚP VỚI TÊN KÊNH TRONG index.html
-const BROADCAST_CHANNEL_PREFIX = 'qr_scans_channel_';
+// Tên kênh Realtime. PHẢI KHỚP VỚI TÊN KÊNH TRONG index.html
+const REALTIME_CHANNEL_PREFIX = 'qr_scans_channel_';
 
 const App: React.FC = () => {
   const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth();
@@ -84,35 +84,41 @@ const App: React.FC = () => {
     }
   }, [cases, handleEditCase]); // Thêm cases và handleEditCase vào dependency array
 
-  // --- BỔ SUNG ĐOẠN CODE NÀY ĐỂ LẮNG NGHE BROADCAST CHANNEL ---
+  // --- BỔ SUNG ĐOẠN CODE NÀY ĐỂ LẮNG NGHE SUPABASE REALTIME ---
+  // Đã khôi phục lại logic Supabase Realtime để hỗ trợ giao tiếp cross-origin
   useEffect(() => {
-    let broadcastChannel: BroadcastChannel | null = null;
+    let realtimeChannel: any = null;
 
-    if (isAuthenticated && user) { // Không cần supabase trong điều kiện này nữa
-      const channelName = `${BROADCAST_CHANNEL_PREFIX}${user.id}`; // Phải khớp với tên kênh trong index.html
-      broadcastChannel = new BroadcastChannel(channelName);
-      console.log(`Đã khởi tạo BroadcastChannel: ${broadcastChannel.name}`);
+    if (isAuthenticated && user && supabase) {
+      const channelName = `${REALTIME_CHANNEL_PREFIX}${user.id}`; // Phải khớp với tên kênh trong index.html
+      realtimeChannel = supabase.channel(channelName);
 
-      broadcastChannel.onmessage = (event) => {
-        console.log('Received Broadcast Channel message:', event.data);
-        if (event.data && event.data.qrData) {
-          handleQrScanSuccess(event.data.qrData); // Gọi hàm xử lý QR code
+      realtimeChannel.on(
+        'broadcast',
+        { event: 'scan_event' }, // Tên sự kiện này PHẢI KHỚP với tên sự kiện trong ứng dụng HTML
+        (payload: any) => {
+          console.log('Received Realtime scan_event:', payload);
+          if (payload.payload && payload.payload.qrData) {
+            handleQrScanSuccess(payload.payload.qrData); // Gọi hàm xử lý QR code
+          }
         }
-      };
-
-      broadcastChannel.onmessageerror = (error) => {
-        console.error('Lỗi Broadcast Channel message:', error);
-      };
+      ).subscribe((status: any) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`Đã đăng ký kênh Realtime: ${channelName}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`Lỗi đăng ký kênh Realtime: ${channelName}`);
+        }
+      });
     }
 
-    // Cleanup function: Đóng BroadcastChannel khi component unmount hoặc user thay đổi
+    // Cleanup function: Hủy đăng ký kênh khi component unmount hoặc user thay đổi
     return () => {
-      if (broadcastChannel) {
-        console.log(`Đóng BroadcastChannel: ${broadcastChannel.name}`);
-        broadcastChannel.close();
+      if (realtimeChannel) {
+        console.log(`Hủy đăng ký kênh Realtime: ${realtimeChannel.name}`);
+        supabase.removeChannel(realtimeChannel);
       }
     };
-  }, [isAuthenticated, user, handleQrScanSuccess]); // Loại bỏ 'supabase' khỏi dependencies
+  }, [isAuthenticated, user, supabase, handleQrScanSuccess]); // 'supabase' được thêm lại vào dependencies
 
 
   // Show loading while initializing or fetching prosecutors
