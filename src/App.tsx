@@ -60,12 +60,17 @@ const App: React.FC = () => {
   // Hàm xử lý khi quét QR thành công
   // Hàm này đã có sẵn và sẽ được gọi khi nhận được QR data
   const handleQrScanSuccess = useCallback((qrData: string) => {
-    console.log('QR Scan Success! QR Data:', qrData);
+    console.log('QR Scan Success! QR Data received:', qrData); // Log dữ liệu QR nhận được
     // Giả định QR Data là Case ID
     const caseId = qrData;
+
+    // Log tất cả các ID vụ án hiện có để so sánh
+    console.log('Current available Case IDs:', cases.map(c => c.id));
+
     const foundCase = cases.find(c => c.id === caseId);
 
     if (foundCase) {
+      console.log('Case found:', foundCase); // Log vụ án tìm thấy
       handleEditCase(foundCase); // Mở form chỉnh sửa với dữ liệu vụ án
       // Optional: hide QR scanner modal if it's open
       setShowQrScannerModal(false);
@@ -109,7 +114,7 @@ const App: React.FC = () => {
         supabase.removeChannel(realtimeChannel);
       }
     };
-  }, [isAuthenticated, user, supabase, handleQrScanSuccess]); // Loại bỏ 'cases' và 'handleEditCase' khỏi dependencies của useEffect này để tránh re-subscribe không cần thiết, vì handleQrScanSuccess đã là useCallback và có dependencies của nó.
+  }, [isAuthenticated, user, supabase, handleQrScanSuccess]);
 
 
   // Show loading while initializing or fetching prosecutors
