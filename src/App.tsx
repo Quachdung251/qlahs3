@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode } from 'lucide-react'; // Thêm QrCode icon
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode } from 'lucide-react';
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
 import CaseTable from './components/CaseTable';
@@ -10,56 +10,107 @@ import ReportForm from './components/ReportForm';
 import ReportTable from './components/ReportTable';
 import ReportStatistics from './components/ReportStatistics';
 import LoginForm from './components/LoginForm';
-import UserManagement from './components/UserManagement'; // Giữ lại nếu có kế hoạch sử dụng
+import UserManagement from './components/UserManagement';
 import { useCases } from './hooks/useCases';
 import { useReports } from './hooks/useReports';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
-import { useIndexedDB } from './hooks/useIndexedDB'; // Sử dụng hook này để kiểm tra isInitialized
+import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
-import { Prosecutor } from './hooks/useProsecutors'; // Import Prosecutor interface từ hook useProsecutors
+import { Prosecutor } from './hooks/useProsecutors';
 import { useProsecutors } from './hooks/useProsecutors';
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils';
-import { Case, Report, CaseFormData, ReportFormData } from './types'; // Import Case, Report và CaseFormData, ReportFormData types
-import { getCurrentDate, getDaysRemaining } from './utils/dateUtils'; // Import getCurrentDate và getDaysRemaining
-import QRCodeScannerModal from './components/QRCodeScannerModal'; // Import modal quét QR
+import { Case, Report, CaseFormData, ReportFormData } from './types';
+import { getCurrentDate, getDaysRemaining } from './utils/dateUtils';
+import QRCodeScannerModal from './components/QRCodeScannerModal';
 
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
   const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth();
-  const { isInitialized } = useIndexedDB(); // Lấy trạng thái khởi tạo IndexedDB
+  const { isInitialized } = useIndexedDB();
   const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
   const [activeTab, setActiveTab] = useState('add');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
-
-  // Thêm state cho ngày bắt đầu và ngày kết thúc thống kê
   const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
   const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
-
-  // Thêm state để quản lý vụ án/tin báo đang được chỉnh sửa
   const [editingCase, setEditingCase] = useState<Case | null>(null);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
-
-  // Sử dụng hook useProsecutors để quản lý danh sách kiểm sát viên
   const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, overwriteAllProsecutors } = useProsecutors();
-
   const userKey = user?.id || 'default';
-  // Cập nhật useCases và useReports để có hàm overwriteAll
-  const { cases, addCase, updateCase, deleteCase, transferStage, toggleImportant, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading, overwriteAllCases } = useCases(userKey, isInitialized); // THÊM toggleImportant
-
+  const { cases, addCase, updateCase, deleteCase, transferStage, toggleImportant, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading, overwriteAllCases } = useCases(userKey, isInitialized);
   const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading, overwriteAllReports } = useReports(userKey, isInitialized);
-
-  // State cho thông báo và trạng thái lưu/khôi phục
   const [showBackupRestoreModal, setShowBackupRestoreModal] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
-  const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false); // State cho modal xác nhận khôi phục
-  const [dataToRestore, setDataToRestore] = useState<{ cases: Case[], reports: Report[] } | null>(null); // Dữ liệu tạm thời để khôi phục
+  const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false);
+  const [dataToRestore, setDataToRestore] = useState<{ cases: Case[], reports: Report[] } | null>(null);
+  const [showQrScannerModal, setShowQrScannerModal] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null); // Thêm state để hiển thị thông báo quét
 
-  const [showQrScannerModal, setShowQrScannerModal] = useState(false); // State để hiển thị modal quét QR
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
+  const handleEditCase = useCallback((caseToEdit: Case) => {
+    setEditingCase(caseToEdit);
+    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
+  }, []); // Không có dependencies vì chỉ set state
+
+  // Hàm xử lý khi quét QR thành công
+  // Hàm này đã có sẵn và sẽ được gọi khi nhận được QR data
+  const handleQrScanSuccess = useCallback((qrData: string) => {
+    console.log('QR Scan Success! QR Data:', qrData);
+    // Giả định QR Data là Case ID
+    const caseId = qrData;
+    const foundCase = cases.find(c => c.id === caseId);
+
+    if (foundCase) {
+      handleEditCase(foundCase); // Mở form chỉnh sửa với dữ liệu vụ án
+      // Optional: hide QR scanner modal if it's open
+      setShowQrScannerModal(false);
+    } else {
+      console.warn(`Không tìm thấy vụ án với ID: ${caseId}`);
+      setScanMessage(`Không tìm thấy vụ án với ID: ${caseId}. Vui lòng kiểm tra lại.`);
+      setTimeout(() => setScanMessage(null), 3000);
+    }
+  }, [cases, handleEditCase]); // Thêm cases và handleEditCase vào dependency array
+
+  // --- BỔ SUNG ĐOẠN CODE NÀY ĐỂ LẮNG NGHE SUPABASE REALTIME ---
+  useEffect(() => {
+    let realtimeChannel: any = null;
+
+    if (isAuthenticated && user && supabase) {
+      const channelName = `qr_scans_channel_${user.id}`; // Phải khớp với tên kênh trong index.html
+      realtimeChannel = supabase.channel(channelName);
+
+      realtimeChannel.on(
+        'broadcast',
+        { event: 'scan_event' },
+        (payload: any) => {
+          console.log('Received Realtime scan_event:', payload);
+          if (payload.payload && payload.payload.qrData) {
+            handleQrScanSuccess(payload.payload.qrData); // Gọi hàm xử lý QR code
+          }
+        }
+      ).subscribe((status: any) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`Đã đăng ký kênh Realtime: ${channelName}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`Lỗi đăng ký kênh Realtime: ${channelName}`);
+        }
+      });
+    }
+
+    // Cleanup function: Hủy đăng ký kênh khi component unmount hoặc user thay đổi
+    return () => {
+      if (realtimeChannel) {
+        console.log(`Hủy đăng ký kênh Realtime: ${realtimeChannel.name}`);
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
+  }, [isAuthenticated, user, supabase, handleQrScanSuccess]); // Loại bỏ 'cases' và 'handleEditCase' khỏi dependencies của useEffect này để tránh re-subscribe không cần thiết, vì handleQrScanSuccess đã là useCallback và có dependencies của nó.
+
 
   // Show loading while initializing or fetching prosecutors
   if (authLoading || !isInitialized || prosecutorsLoading) {
@@ -100,13 +151,6 @@ const App: React.FC = () => {
     console.log('Updated prosecutors data in App:', data);
     // useProsecutors hook đã tự cập nhật state và IndexedDB, không cần setProsecutors ở đây
     // setProsecutors(data); // Dòng này không còn cần thiết
-  };
-
-  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
-  const handleEditCase = (caseToEdit: Case) => {
-    setEditingCase(caseToEdit);
-    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
-    setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
   };
 
   // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một tin báo
@@ -482,22 +526,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Hàm xử lý khi quét QR thành công
-  const handleQrScanSuccess = (caseId: string) => {
-    console.log('QR Scan Success! Case ID:', caseId);
-    // Tìm vụ án tương ứng trong danh sách
-    const foundCase = cases.find(c => c.id === caseId);
-    if (foundCase) {
-      handleEditCase(foundCase); // Mở form chỉnh sửa với dữ liệu vụ án
-    } else {
-      // Xử lý trường hợp không tìm thấy vụ án (ví dụ: hiển thị thông báo)
-      console.warn(`Không tìm thấy vụ án với ID: ${caseId}`);
-      // Có thể hiển thị một modal thông báo "Không tìm thấy vụ án"
-      setScanMessage(`Không tìm thấy vụ án với ID: ${caseId}. Vui lòng kiểm tra lại.`);
-      setTimeout(() => setScanMessage(null), 3000); // Xóa thông báo sau 3 giây
-    }
-  };
-
   const renderMainContent = () => {
     if (activeSystem === 'reports') {
       switch (activeTab) {
@@ -842,6 +870,13 @@ const App: React.FC = () => {
           onScanSuccess={handleQrScanSuccess}
           onClose={() => setShowQrScannerModal(false)}
         />
+      )}
+
+      {/* Thông báo quét QR (hiển thị tạm thời) */}
+      {scanMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 p-3 bg-blue-100 text-blue-800 rounded-md shadow-lg z-50">
+          {scanMessage}
+        </div>
       )}
     </div>
   );
