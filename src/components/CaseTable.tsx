@@ -1,10 +1,12 @@
 // ./components/CaseTable.tsx
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star } from 'lucide-react'; // THÊM Star icon
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer } from 'lucide-react'; // THÊM Printer icon
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 import NotesModal from './NotesModal';
 import ExtensionModal from './ExtensionModal';
+import QRCodeDisplayModal from './QRCodeDisplayModal'; // Import modal hiển thị QR
+import { generateQrCodeData } from '../utils/qrUtils'; // Import hàm tiện ích
 
 interface CaseTableProps {
   cases: Case[];
@@ -17,7 +19,7 @@ interface CaseTableProps {
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onUpdateCase: (updatedCase: Case) => void;
   onEditCase: (caseItem: Case) => void;
-  onToggleImportant: (caseId: string) => void; // THÊM PROP NÀY: Hàm xử lý khi nhấn ngôi sao
+  onToggleImportant: (caseId: string, isImportant: boolean) => void; // CẬP NHẬT PROP NÀY để truyền trạng thái mới
   showWarnings?: boolean;
 }
 
@@ -41,6 +43,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
     defendant?: Defendant;
   } | null>(null);
 
+  // State mới cho modal hiển thị QR Code
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
+
   const toggleExpanded = (caseId: string) => {
     const newExpanded = new Set(expandedCases);
     if (newExpanded.has(caseId)) {
@@ -59,6 +65,13 @@ const CaseTable: React.FC<CaseTableProps> = ({
       newExpanded.add(caseId);
     }
     setExpandedActions(newExpanded);
+  };
+
+  // Hàm xử lý in nhãn QR Code cho vụ án hiện có
+  const handlePrintExistingQR = (caseItem: Case) => {
+    const qrValue = generateQrCodeData(caseItem);
+    setQrCaseData({ qrValue, caseName: caseItem.name });
+    setShowQrModal(true);
   };
 
   const getStageActions = (caseItem: Case) => {
@@ -131,13 +144,26 @@ const CaseTable: React.FC<CaseTableProps> = ({
         <button
           key="discontinue"
           onClick={() => setConfirmDelete(caseItem.id)} // Đã chuyển nút xóa vào đây
-          className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowathitespace-nowrap"
+          className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
           Đình chỉ
         </button>
       );
     }
+
+    // Thêm nút In nhãn QR Code vào danh sách hành động
+    actions.push(
+      <button
+        key="print-qr"
+        onClick={() => handlePrintExistingQR(caseItem)}
+        className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
+        title="In nhãn QR Code"
+      >
+        <Printer size={12} />
+        In QR
+      </button>
+    );
 
     return actions;
   };
@@ -201,7 +227,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       case 'isImportant': // THÊM CASE NÀY
         return (
           <button
-            onClick={() => onToggleImportant(caseItem.id)}
+            onClick={() => onToggleImportant(caseItem.id, !caseItem.isImportant)} // CẬP NHẬT onToggleImportant
             className={`p-1 rounded-full transition-colors ${
               caseItem.isImportant ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-500'
             }`}
@@ -240,7 +266,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
               {/* Show first action if available */}
               {stageActions.length > 0 && stageActions[0]}
 
-              {/* More actions button if there are additional actions */}
+              {/* More actions button if there are additional actions (excluding the first one) */}
               {stageActions.length > 1 && (
                 <button
                   onClick={() => toggleActions(caseItem.id)}
@@ -255,6 +281,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
             {isExpanded && stageActions.length > 1 && (
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-max">
                 <div className="p-2 space-y-1">
+                  {/* Render all actions except the first one, which is already displayed */}
                   {stageActions.slice(1).map((action, index) => (
                     <div key={index} className="block">
                       {action}
@@ -316,83 +343,85 @@ const CaseTable: React.FC<CaseTableProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {cases.map((caseItem) => (
-              <React.Fragment key={caseItem.id}>
-                <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => toggleExpanded(caseItem.id)}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      {expandedCases.has(caseItem.id) ? (
-                        <ChevronDown size={20} />
-                      ) : (
-                        <ChevronRight size={20} />
-                      )}
-                    </button>
-                  </td>
-                  {/* RENDER NÚT STAR */}
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
-                  </td>
-                  {columns.map((column) => (
-                    <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
-                      {renderCellContent(caseItem, column)}
+            {cases.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length + 2} className="text-center py-8 text-gray-500">
+                  Không có vụ án nào để hiển thị.
+                </td>
+              </tr>
+            ) : (
+              cases.map((caseItem) => (
+                <React.Fragment key={caseItem.id}>
+                  <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => toggleExpanded(caseItem.id)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        {expandedCases.has(caseItem.id) ? (
+                          <ChevronDown size={20} />
+                        ) : (
+                          <ChevronRight size={20} />
+                        )}
+                      </button>
                     </td>
-                  ))}
-                </tr>
-                {expandedCases.has(caseItem.id) && (
-                  <tr>
-                    <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50"> {/* CỘT +2 (mở rộng + quan trọng) */}
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
-                        {caseItem.defendants.map((defendant, index) => (
-                          <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
-                              <div className="w-40 flex-shrink-0">
-                                <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
-                              </div>
-                              <div className="w-80 flex-shrink-0">
-                                <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
-                              </div>
-                              <div className="w-40 flex-shrink-0">
-                                <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
-                              </div>
-                              {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex-auto flex items-center">
-                                  <div>
-                                    <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
-                                    <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                                      ({getDaysRemaining(defendant.detentionDeadline)} ngày)
-                                    </span>
-                                  </div>
-                                  <button
-                                    onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
-                                    className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
-                                  >
-                                    <Clock size={10} />
-                                    Gia hạn
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    {/* RENDER NÚT STAR */}
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
                     </td>
+                    {columns.map((column) => (
+                      <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
+                        {renderCellContent(caseItem, column)}
+                      </td>
+                    ))}
                   </tr>
-                )}
-              </React.Fragment>
-            ))}
+                  {expandedCases.has(caseItem.id) && (
+                    <tr>
+                      <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50"> {/* CỘT +2 (mở rộng + quan trọng) */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
+                          {caseItem.defendants.map((defendant, index) => (
+                            <div key={defendant.id || index} className="bg-white p-3 rounded border">
+                              <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
+                                <div className="w-40 flex-shrink-0">
+                                  <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
+                                </div>
+                                <div className="w-80 flex-shrink-0">
+                                  <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
+                                </div>
+                                <div className="w-40 flex-shrink-0">
+                                  <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
+                                </div>
+                                {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
+                                  <div className="flex-auto flex items-center">
+                                    <div>
+                                      <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
+                                      <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                        ({getDaysRemaining(defendant.detentionDeadline)} ngày)
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
+                                      className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
+                                    >
+                                      <Clock size={10} />
+                                      Gia hạn
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))
+            )}
           </tbody>
         </table>
       </div>
-
-      {cases.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          Không có vụ án nào
-        </div>
-      )}
 
       {/* Notes Modal */}
       {notesCase && (
@@ -441,6 +470,15 @@ const CaseTable: React.FC<CaseTableProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal hiển thị QR Code cho vụ án hiện có */}
+      {showQrModal && qrCaseData && (
+        <QRCodeDisplayModal
+          qrCodeValue={qrCaseData.qrValue}
+          caseName={qrCaseData.caseName}
+          onClose={() => setShowQrModal(false)}
+        />
       )}
     </div>
   );
