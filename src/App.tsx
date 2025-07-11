@@ -18,7 +18,7 @@ import { useIndexedDB } from './hooks/useIndexedDB'; // Sử dụng hook này đ
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor } from './hooks/useProsecutors'; // Import Prosecutor interface từ hook useProsecutors
 import { useProsecutors } from './hooks/useProsecutors';
-import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils'; 
+import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils';
 import { Case, Report, CaseFormData, ReportFormData } from './types'; // Import Case, Report và CaseFormData, ReportFormData types
 import { getCurrentDate, getDaysRemaining } from './utils/dateUtils'; // Import getCurrentDate và getDaysRemaining
 
@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('add');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
-  
+
   // Thêm state cho ngày bắt đầu và ngày kết thúc thống kê
   const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
   const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
@@ -45,7 +45,8 @@ const App: React.FC = () => {
 
   const userKey = user?.id || 'default';
   // Cập nhật useCases và useReports để có hàm overwriteAll
-  const { cases, addCase, updateCase, deleteCase, transferStage, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading, overwriteAllCases } = useCases(userKey, isInitialized);
+  const { cases, addCase, updateCase, deleteCase, transferStage, toggleImportant, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading, overwriteAllCases } = useCases(userKey, isInitialized); // THÊM toggleImportant
+
   const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading, overwriteAllReports } = useReports(userKey, isInitialized);
 
   // State cho thông báo và trạng thái lưu/khôi phục
@@ -115,7 +116,7 @@ const App: React.FC = () => {
   // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
   const handleCaseFormSubmit = (caseData: CaseFormData, isEditing: boolean) => {
     if (isEditing && editingCase) {
-      updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt });
+      updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant }); // GIỮ isImportant
       setEditingCase(null); // Xóa trạng thái chỉnh sửa
       setActiveTab('all'); // Chuyển về tab danh sách
     } else {
@@ -137,17 +138,17 @@ const App: React.FC = () => {
   // Filter cases/reports based on search term and prosecutor
   const filterItems = (itemsToFilter: any[]) => {
     return itemsToFilter.filter(item => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.charges.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.defendants && item.defendants.some((d: any) => 
+        (item.defendants && item.defendants.some((d: any) =>
           d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           d.charges.toLowerCase().includes(searchTerm.toLowerCase())
         ));
-      
-      const matchesProsecutor = !selectedProsecutor || 
+
+      const matchesProsecutor = !selectedProsecutor ||
         item.prosecutor === selectedProsecutor;
-      
+
       return matchesSearch && matchesProsecutor;
     });
   };
@@ -162,9 +163,9 @@ const App: React.FC = () => {
       case 'all':
         return [
           ...baseColumns,
-          { 
-            key: 'charges' as const, 
-            label: 'Tội danh (VA)', 
+          {
+            key: 'charges' as const,
+            label: 'Tội danh (VA)',
             render: (caseItem: Case) => {
               const match = caseItem.charges.match(/Điều \d+/);
               return match ? match[0] : caseItem.charges;
@@ -183,8 +184,8 @@ const App: React.FC = () => {
       case 'investigation':
         return [
           ...baseColumns,
-          { 
-            key: 'charges' as const, 
+          {
+            key: 'charges' as const,
             label: 'Tội danh (VA)',
             render: (caseItem: Case) => {
               const match = caseItem.charges.match(/Điều \d+/);
@@ -201,8 +202,8 @@ const App: React.FC = () => {
       case 'prosecution':
         return [
           ...baseColumns,
-          { 
-            key: 'charges' as const, 
+          {
+            key: 'charges' as const,
             label: 'Tội danh (VA)',
             render: (caseItem: Case) => {
               const match = caseItem.charges.match(/Điều \d+/);
@@ -219,8 +220,8 @@ const App: React.FC = () => {
       case 'trial':
         return [
           ...baseColumns,
-          { 
-            key: 'charges' as const, 
+          {
+            key: 'charges' as const,
             label: 'Tội danh (VA)',
             render: (caseItem: Case) => {
               const match = caseItem.charges.match(/Điều \d+/);
@@ -237,8 +238,8 @@ const App: React.FC = () => {
       case 'expiring':
         return [
           ...baseColumns,
-          { 
-            key: 'charges' as const, 
+          {
+            key: 'charges' as const,
             label: 'Tội danh (VA)',
             render: (caseItem: Case) => {
               const match = caseItem.charges.match(/Điều \d+/);
@@ -300,11 +301,11 @@ const App: React.FC = () => {
 
   const getCaseTableData = () => {
     if (casesLoading) return [];
-    
+
     let data;
     switch (activeTab) {
       case 'all':
-        data = cases;
+        data = cases; // cases đã được sắp xếp trong useCases
         break;
       case 'investigation':
         data = getCasesByStage('Điều tra');
@@ -326,7 +327,7 @@ const App: React.FC = () => {
 
   const getReportTableData = () => {
     if (reportsLoading) return [];
-    
+
     let data;
     switch (activeTab) {
       case 'all':
@@ -353,7 +354,7 @@ const App: React.FC = () => {
       exportToExcel(dataToExport, columns, 'ThongKeVuAn');
     } else {
       const filteredCases = getCaseTableData();
-      const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases, activeTab); 
+      const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases, activeTab);
       exportToExcel(dataToExport, columns, 'DanhSachVuAn');
     }
   };
@@ -466,15 +467,7 @@ const App: React.FC = () => {
       // Ghi đè dữ liệu vào IndexedDB thông qua các hooks
       await overwriteAllCases(dataToRestore.cases);
       await overwriteAllReports(dataToRestore.reports);
-      // Nếu có dữ liệu prosecutors trong backup, cũng cần khôi phục
-      // Tuy nhiên, cấu trúc backup hiện tại không bao gồm prosecutors.
-      // Nếu muốn backup prosecutors, cần sửa đổi handleSaveDataToSupabase để bao gồm nó.
-      // For now, we assume prosecutors are managed separately or always fetched from Supabase.
-      // await overwriteAllProsecutors(dataToRestore.prosecutors); // Nếu prosecutors có trong backup
-
       setRestoreMessage('Khôi phục dữ liệu thành công từ Supabase! Dữ liệu đã được cập nhật.');
-      // Có thể cần refresh lại trang hoặc các state liên quan nếu dữ liệu không tự động cập nhật
-      // window.location.reload(); // Hoặc gọi lại các hàm fetch dữ liệu
     } catch (error: any) {
       console.error('Lỗi khi khôi phục dữ liệu sau xác nhận:', error.message);
       setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
@@ -489,10 +482,10 @@ const App: React.FC = () => {
       switch (activeTab) {
         case 'add':
           return (
-            <ReportForm 
+            <ReportForm
               onSubmit={(data, isEditing) => handleReportFormSubmit(data, isEditing)}
-              onTransferToCase={addCase} 
-              prosecutors={prosecutors} 
+              onTransferToCase={addCase}
+              prosecutors={prosecutors}
               initialData={editingReport}
               onCancelEdit={() => {
                 setEditingReport(null);
@@ -512,8 +505,8 @@ const App: React.FC = () => {
                   Xuất Excel Tin Báo
                 </button>
               </div>
-              <ReportStatistics 
-                reports={reports} 
+              <ReportStatistics
+                reports={reports}
                 fromDate={statisticsFromDate}
                 toDate={statisticsToDate}
                 setFromDate={setStatisticsFromDate}
@@ -564,9 +557,9 @@ const App: React.FC = () => {
       switch (activeTab) {
         case 'add':
           return (
-            <CaseForm 
+            <CaseForm
               onSubmit={(data, isEditing) => handleCaseFormSubmit(data, isEditing)}
-              prosecutors={prosecutors} 
+              prosecutors={prosecutors}
               initialData={editingCase}
               onCancelEdit={() => {
                 setEditingCase(null);
@@ -586,8 +579,8 @@ const App: React.FC = () => {
                   Xuất Excel Vụ Án
                 </button>
               </div>
-              <Statistics 
-                cases={cases} 
+              <Statistics
+                cases={cases}
                 fromDate={statisticsFromDate}
                 toDate={statisticsToDate}
                 setFromDate={setStatisticsFromDate}
@@ -629,6 +622,7 @@ const App: React.FC = () => {
                 onTransferStage={transferStage}
                 onUpdateCase={updateCase}
                 onEditCase={handleEditCase}
+                onToggleImportant={toggleImportant} // THÊM PROP NÀY
                 showWarnings={activeTab === 'expiring'}
               />
             </>
@@ -648,7 +642,7 @@ const App: React.FC = () => {
                 <Scale className="text-blue-600" size={28} />
                 <h1 className="text-2xl font-bold text-gray-900">Hệ Thống Quản Lý</h1>
               </div>
-              
+
               {/* System Selector */}
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
@@ -675,25 +669,25 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-500">
-                {activeSystem === 'cases' 
+                {activeSystem === 'cases'
                   ? `Tổng số vụ án: ${cases.length}`
                   : `Tổng số tin báo: ${reports.length}`
                 }
               </div>
-              
+
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
-              
+
               {/* Nút Lưu/Khôi phục dữ liệu Supabase */}
               <button
                 onClick={() => setShowBackupRestoreModal(true)}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
                 title="Lưu và Khôi phục dữ liệu từ Supabase"
-                disabled={!user || !supabase} 
+                disabled={!user || !supabase}
               >
                 <Cloud size={16} />
                 Cloud
@@ -713,9 +707,9 @@ const App: React.FC = () => {
 
       {/* Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <TabNavigation 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
+        <TabNavigation
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           expiringSoonCount={expiringSoonCount}
           systemType={activeSystem}
         />
@@ -801,7 +795,6 @@ const App: React.FC = () => {
                 onClick={() => {
                   setShowRestoreConfirmModal(false);
                   setDataToRestore(null); // Xóa dữ liệu tạm thời
-                  setRestoreMessage('Khôi phục đã bị hủy.');
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
               >
