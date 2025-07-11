@@ -99,12 +99,20 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       }
     }
 
-    // Kiểm tra các trường bắt buộc sau khi đã xử lý tự động điền
+    // Kiểm tra các trường bắt buộc của vụ án sau khi đã xử lý tự động điền
     if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
       setErrorMessage('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên và vụ án chưa có tên/tội danh)');
       return;
     }
 
+    // Kiểm tra tội danh của từng bị can phải là tội cụ thể (không phải rỗng hoặc "Chưa xác định")
+    for (const defendant of finalCaseData.defendants) {
+      if (defendant.charges.trim() === '' || defendant.charges === 'Chưa xác định') {
+        setErrorMessage('Tội danh của tất cả bị can phải được xác định cụ thể. Vui lòng kiểm tra lại thông tin bị can.');
+        return;
+      }
+    }
+    
     onSubmit(finalCaseData, !!initialData);
 
     // Reset form chỉ khi ở chế độ thêm mới
@@ -122,23 +130,36 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
   };
 
   const addDefendant = () => {
-    // THÊM LOGIC TỰ ĐỘNG ĐIỀN
-    const defaultCharges = 'Chưa xác định'; // Giá trị mặc định cho tội danh
-    // Giá trị mặc định cho thời hạn tạm giam (ví dụ: 30 ngày kể từ hôm nay)
-    const defaultDetentionDeadline = addDaysToCurrentDate(30);
+    setFormData(prev => {
+      const newDefendants = [...prev.defendants];
+      const firstDefendant = newDefendants.length > 0 ? newDefendants[0] : null;
 
-    setFormData(prev => ({
-      ...prev,
-      defendants: [
-        ...prev.defendants,
-        {
-          name: '',
-          charges: defaultCharges, // Tự động điền tội danh
-          preventiveMeasure: 'Tại ngoại', // Mặc định là tại ngoại
-          detentionDeadline: defaultDetentionDeadline // Tự động điền hạn tạm giam (sẽ bị ẩn nếu biện pháp là tại ngoại)
+      let newDefendant: Omit<Defendant, 'id'>;
+
+      if (firstDefendant) {
+        // Nếu đã có bị can đầu tiên, các bị can sau sẽ mặc định theo bị can đầu tiên
+        newDefendant = {
+          name: '', // Tên bị can để trống
+          charges: firstDefendant.charges || '', // Tội danh mặc định theo bị can 1
+          preventiveMeasure: firstDefendant.preventiveMeasure || 'Tại ngoại', // Biện pháp mặc định theo bị can 1
+        };
+        if (newDefendant.preventiveMeasure === 'Tạm giam') {
+          newDefendant.detentionDeadline = firstDefendant.detentionDeadline || addDaysToCurrentDate(30); // Hạn tạm giam theo bị can 1 hoặc mặc định 30 ngày
         }
-      ]
-    }));
+      } else {
+        // Nếu là bị can đầu tiên, tội danh để trống để người dùng nhập cụ thể
+        newDefendant = {
+          name: '',
+          charges: '', // Để trống để người dùng nhập cụ thể
+          preventiveMeasure: 'Tại ngoại',
+          detentionDeadline: addDaysToCurrentDate(30) // Mặc định 30 ngày (sẽ ẩn nếu tại ngoại)
+        };
+      }
+      return {
+        ...prev,
+        defendants: [...newDefendants, newDefendant]
+      };
+    });
   };
 
   const removeDefendant = (index: number) => {
