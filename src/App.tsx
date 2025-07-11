@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X } from 'lucide-react'; // Thêm Cloud, Upload, X icon
+import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode } from 'lucide-react'; // Thêm QrCode icon
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
 import CaseTable from './components/CaseTable';
@@ -21,6 +21,7 @@ import { useProsecutors } from './hooks/useProsecutors';
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils';
 import { Case, Report, CaseFormData, ReportFormData } from './types'; // Import Case, Report và CaseFormData, ReportFormData types
 import { getCurrentDate, getDaysRemaining } from './utils/dateUtils'; // Import getCurrentDate và getDaysRemaining
+import QRCodeScannerModal from './components/QRCodeScannerModal'; // Import modal quét QR
 
 type SystemType = 'cases' | 'reports';
 
@@ -57,6 +58,8 @@ const App: React.FC = () => {
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false); // State cho modal xác nhận khôi phục
   const [dataToRestore, setDataToRestore] = useState<{ cases: Case[], reports: Report[] } | null>(null); // Dữ liệu tạm thời để khôi phục
+
+  const [showQrScannerModal, setShowQrScannerModal] = useState(false); // State để hiển thị modal quét QR
 
   // Show loading while initializing or fetching prosecutors
   if (authLoading || !isInitialized || prosecutorsLoading) {
@@ -114,14 +117,16 @@ const App: React.FC = () => {
   };
 
   // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
-  const handleCaseFormSubmit = (caseData: CaseFormData, isEditing: boolean) => {
+  const handleCaseFormSubmit = async (caseData: CaseFormData, isEditing: boolean) => {
+    let resultCase: Case | void;
     if (isEditing && editingCase) {
-      updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant }); // GIỮ isImportant
+      resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant }); // GIỮ isImportant
       setEditingCase(null); // Xóa trạng thái chỉnh sửa
       setActiveTab('all'); // Chuyển về tab danh sách
     } else {
-      addCase(caseData);
+      resultCase = await addCase(caseData);
     }
+    return resultCase; // Trả về vụ án đã được thêm/cập nhật
   };
 
   // Hàm xử lý khi form chỉnh sửa tin báo hoàn tất (lưu hoặc hủy)
@@ -477,6 +482,22 @@ const App: React.FC = () => {
     }
   };
 
+  // Hàm xử lý khi quét QR thành công
+  const handleQrScanSuccess = (caseId: string) => {
+    console.log('QR Scan Success! Case ID:', caseId);
+    // Tìm vụ án tương ứng trong danh sách
+    const foundCase = cases.find(c => c.id === caseId);
+    if (foundCase) {
+      handleEditCase(foundCase); // Mở form chỉnh sửa với dữ liệu vụ án
+    } else {
+      // Xử lý trường hợp không tìm thấy vụ án (ví dụ: hiển thị thông báo)
+      console.warn(`Không tìm thấy vụ án với ID: ${caseId}`);
+      // Có thể hiển thị một modal thông báo "Không tìm thấy vụ án"
+      setScanMessage(`Không tìm thấy vụ án với ID: ${caseId}. Vui lòng kiểm tra lại.`);
+      setTimeout(() => setScanMessage(null), 3000); // Xóa thông báo sau 3 giây
+    }
+  };
+
   const renderMainContent = () => {
     if (activeSystem === 'reports') {
       switch (activeTab) {
@@ -682,6 +703,16 @@ const App: React.FC = () => {
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
 
+              {/* Nút Quét Hồ Sơ */}
+              <button
+                onClick={() => setShowQrScannerModal(true)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                title="Quét mã QR hồ sơ"
+              >
+                <QrCode size={16} />
+                Quét Hồ Sơ
+              </button>
+
               {/* Nút Lưu/Khôi phục dữ liệu Supabase */}
               <button
                 onClick={() => setShowBackupRestoreModal(true)}
@@ -803,6 +834,14 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Quét QR Code */}
+      {showQrScannerModal && (
+        <QRCodeScannerModal
+          onScanSuccess={handleQrScanSuccess}
+          onClose={() => setShowQrScannerModal(false)}
+        />
       )}
     </div>
   );
