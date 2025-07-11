@@ -1,37 +1,38 @@
+// ./components/CaseTable.tsx
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star } from 'lucide-react'; // THÊM Star icon
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
-// import CaseEditModal from './CaseEditModal'; // XÓA DÒNG NÀY: Modal chỉnh sửa sẽ được quản lý ở App.tsx
 import NotesModal from './NotesModal';
 import ExtensionModal from './ExtensionModal';
 
 interface CaseTableProps {
   cases: Case[];
   columns: {
-    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions';
+    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant'; // THÊM 'isImportant' vào key
     label: string;
     render?: (caseItem: Case) => React.ReactNode;
   }[];
   onDeleteCase: (caseId: string) => void;
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onUpdateCase: (updatedCase: Case) => void;
-  onEditCase: (caseItem: Case) => void; // <--- THÊM PROP NÀY: Hàm xử lý khi nhấn Sửa
+  onEditCase: (caseItem: Case) => void;
+  onToggleImportant: (caseId: string) => void; // THÊM PROP NÀY: Hàm xử lý khi nhấn ngôi sao
   showWarnings?: boolean;
 }
 
-const CaseTable: React.FC<CaseTableProps> = ({ 
-  cases, 
-  columns, 
-  onDeleteCase, 
+const CaseTable: React.FC<CaseTableProps> = ({
+  cases,
+  columns,
+  onDeleteCase,
   onTransferStage,
   onUpdateCase,
-  onEditCase, // <--- NHẬN PROP MỚI
-  showWarnings = false 
+  onEditCase,
+  onToggleImportant, // NHẬN PROP MỚI
+  showWarnings = false
 }) => {
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  // const [editingCase, setEditingCase] = useState<Case | null>(null); // XÓA DÒNG NÀY: State này sẽ được quản lý ở App.tsx
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
   const [notesCase, setNotesCase] = useState<Case | null>(null);
   const [extensionModal, setExtensionModal] = useState<{
@@ -62,7 +63,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   const getStageActions = (caseItem: Case) => {
     const actions = [];
-    
+
     switch (caseItem.stage) {
       case 'Điều tra':
         actions.push(
@@ -114,7 +115,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
           Chuyển đi
         </button>
       );
-      
+
       actions.push(
         <button
           key="suspend"
@@ -125,12 +126,12 @@ const CaseTable: React.FC<CaseTableProps> = ({
           Tạm ĐC
         </button>
       );
-      
+
       actions.push(
         <button
           key="discontinue"
           onClick={() => setConfirmDelete(caseItem.id)} // Đã chuyển nút xóa vào đây
-          className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
+          className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowathitespace-nowrap"
         >
           <Trash2 size={12} />
           Đình chỉ
@@ -197,22 +198,34 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return `${shortestDetentionDays} ngày`;
       case 'notes':
         return renderNotesCell(caseItem);
+      case 'isImportant': // THÊM CASE NÀY
+        return (
+          <button
+            onClick={() => onToggleImportant(caseItem.id)}
+            className={`p-1 rounded-full transition-colors ${
+              caseItem.isImportant ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-500'
+            }`}
+            title={caseItem.isImportant ? 'Bỏ đánh dấu quan trọng' : 'Đánh dấu quan trọng'}
+          >
+            <Star size={20} fill={caseItem.isImportant ? 'currentColor' : 'none'} />
+          </button>
+        );
       case 'actions':
         const stageActions = getStageActions(caseItem);
         const isExpanded = expandedActions.has(caseItem.id);
-        
+
         return (
           <div className="relative">
             <div className="flex items-center gap-1">
               {/* Always show Edit button, now calling onEditCase prop */}
               <button
-                onClick={() => onEditCase(caseItem)} // <--- THAY ĐỔI: Gọi onEditCase prop
+                onClick={() => onEditCase(caseItem)}
                 className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
               >
                 <Edit2 size={12} />
                 Sửa
               </button>
-              
+
               {/* Extension button for investigation stage */}
               {caseItem.stage === 'Điều tra' && (
                 <button
@@ -223,10 +236,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
                   Gia hạn ĐT
                 </button>
               )}
-              
+
               {/* Show first action if available */}
               {stageActions.length > 0 && stageActions[0]}
-              
+
               {/* More actions button if there are additional actions */}
               {stageActions.length > 1 && (
                 <button
@@ -237,7 +250,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 </button>
               )}
             </div>
-            
+
             {/* Expanded actions dropdown */}
             {isExpanded && stageActions.length > 1 && (
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-max">
@@ -247,7 +260,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       {action}
                     </div>
                   ))}
-                  {/* Nút xóa đã được di chuyển vào getStageActions */}
                 </div>
               </div>
             )}
@@ -257,19 +269,27 @@ const CaseTable: React.FC<CaseTableProps> = ({
         if (column.render) {
           return column.render(caseItem);
         }
-        return caseItem[column.key as keyof Case];
+        // Fallback for direct key access, ensuring it's a string or number
+        const value = caseItem[column.key as keyof Case];
+        return typeof value === 'string' || typeof value === 'number' ? value : '';
     }
   };
 
   const isRowHighlighted = (caseItem: Case) => {
-    if (!showWarnings) return false;
-    
-    if (caseItem.stage === 'Điều tra' && isExpiringSoon(caseItem.investigationDeadline)) {
-      return true;
+    if (caseItem.isImportant) { // Highlight if important
+      return 'bg-blue-50';
     }
-    
-    const detainedDefendants = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-    return detainedDefendants.some(d => isExpiringSoon(d.detentionDeadline!));
+    if (showWarnings) { // Highlight if expiring soon
+      if (caseItem.stage === 'Điều tra' && isExpiringSoon(caseItem.investigationDeadline)) {
+        return 'bg-yellow-50';
+      }
+
+      const detainedDefendants = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+      if (detainedDefendants.some(d => isExpiringSoon(d.detentionDeadline!))) {
+        return 'bg-yellow-50';
+      }
+    }
+    return ''; // No highlight
   };
 
   return (
@@ -280,6 +300,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Mở rộng
+              </th>
+              {/* THÊM CỘT MỚI CHO STAR */}
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Quan trọng
               </th>
               {columns.map((column) => (
                 <th
@@ -294,7 +318,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {cases.map((caseItem) => (
               <React.Fragment key={caseItem.id}>
-                <tr className={`${isRowHighlighted(caseItem) ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
                       onClick={() => toggleExpanded(caseItem.id)}
@@ -307,6 +331,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       )}
                     </button>
                   </td>
+                  {/* RENDER NÚT STAR */}
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
+                  </td>
                   {columns.map((column) => (
                     <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
                       {renderCellContent(caseItem, column)}
@@ -315,24 +343,23 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 </tr>
                 {expandedCases.has(caseItem.id) && (
                   <tr>
-                    <td colSpan={columns.length + 1} className="px-6 py-4 bg-gray-50">
+                    <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50"> {/* CỘT +2 (mở rộng + quan trọng) */}
                       <div className="space-y-2">
                         <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                         {caseItem.defendants.map((defendant, index) => (
                           <div key={defendant.id || index} className="bg-white p-3 rounded border">
-                            {/* Sử dụng flexbox với độ rộng cố định và cho phép nội dung xuống dòng */}
                             <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
-                              <div className="w-40 flex-shrink-0"> {/* Tên: w-40 (2cm) */}
+                              <div className="w-40 flex-shrink-0">
                                 <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                               </div>
-                              <div className="w-80 flex-shrink-0"> {/* Tội danh: w-48 (1.5 lần 1cm) */}
+                              <div className="w-80 flex-shrink-0">
                                 <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
                               </div>
-                              <div className="w-40 flex-shrink-0"> {/* Biện pháp: w-32 (1cm) */}
+                              <div className="w-40 flex-shrink-0">
                                 <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
                               </div>
                               {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                                <div className="flex-auto flex items-center"> {/* Hạn tạm giam - tự động co giãn */}
+                                <div className="flex-auto flex items-center">
                                   <div>
                                     <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
                                     <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
@@ -343,7 +370,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                                     onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
                                     className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
                                   >
-                                    <Clock size={10} /> 
+                                    <Clock size={10} />
                                     Gia hạn
                                   </button>
                                 </div>
@@ -360,7 +387,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
           </tbody>
         </table>
       </div>
-      
+
       {cases.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           Không có vụ án nào
