@@ -1,8 +1,8 @@
 // src/components/QRCodeDisplayModal.tsx
 import React, { useRef } from 'react';
-import QRCode from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react'; // ĐẢM BẢO DÒNG NÀY LÀ ĐÚNG: Import QRCodeCanvas là named export
 import { Download, Printer, X } from 'lucide-react';
-import { createPrintableQrLabel } from '../utils/qrUtils'; // Import hàm tiện ích
+import { createPrintableQrHtml } from '../utils/qrUtils'; // Import hàm tiện ích
 
 interface QRCodeDisplayModalProps {
   qrCodeValue: string;
@@ -29,73 +29,8 @@ const QRCodeDisplayModal: React.FC<QRCodeDisplayModalProps> = ({ qrCodeValue, ca
   const handlePrintQR = () => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      const printContent = createPrintableQrLabel(qrCodeValue, caseName);
-      printWindow.document.write(`
-        <html>
-        <head>
-          <title>In Nhãn QR Code</title>
-          <style>
-            @page {
-              size: 4cm 3cm; /* Kích thước nhãn 4x3 cm */
-              margin: 0;
-            }
-            body {
-              font-family: 'Inter', sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              margin: 0;
-            }
-            .label-container {
-              width: 4cm;
-              height: 3cm;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-              align-items: center;
-              padding: 5px;
-              box-sizing: border-box; /* Đảm bảo padding không làm tăng kích thước */
-            }
-            .label-name {
-              font-size: 8px;
-              font-weight: bold;
-              margin-top: 5px;
-              text-align: center;
-              word-break: break-word; /* Ngắt từ nếu tên dài */
-            }
-            canvas {
-              width: 2.5cm !important; /* Đảm bảo kích thước QR code phù hợp */
-              height: 2.5cm !important;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="label-container">
-            <canvas id="qrCanvasPrint"></canvas>
-            <div class="label-name">${caseName}</div>
-          </div>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.0.0/qrcode.min.js"></script>
-          <script>
-            // Sử dụng qrcode.js để render QR code trên cửa sổ in
-            var qrcode = new QRCode(document.getElementById("qrCanvasPrint"), {
-              text: "${qrCodeValue}",
-              width: 80,
-              height: 80,
-              colorDark : "#000000",
-              colorLight : "#ffffff",
-              correctLevel : QRCode.CorrectLevel.H
-            });
-            window.onload = function() {
-              printWindow.print();
-              printWindow.onafterprint = function() {
-                printWindow.close();
-              };
-            };
-          </script>
-        </body>
-        </html>
-      `);
+      const htmlContent = createPrintableQrHtml(qrCodeValue, caseName);
+      printWindow.document.write(htmlContent);
       printWindow.document.close();
     }
   };
@@ -112,7 +47,8 @@ const QRCodeDisplayModal: React.FC<QRCodeDisplayModalProps> = ({ qrCodeValue, ca
         </button>
         <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Mã QR Vụ Án Mới</h3>
         <div className="flex justify-center mb-6">
-          <QRCode
+          {/* QRCodeCanvas component để hiển thị trong modal */}
+          <QRCodeCanvas // SỬ DỤNG QRCodeCanvas
             value={qrCodeValue}
             size={180}
             level="H"
