@@ -1,6 +1,6 @@
 // ./components/CaseTable.tsx
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 import NotesModal from './NotesModal';
@@ -175,7 +175,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   const renderCaseNameCell = (caseItem: Case) => {
     return (
-      // Sử dụng w-48 để cố định chiều rộng, overflow-hidden và text-ellipsis để thu gọn
       <div className="w-48 overflow-hidden text-ellipsis whitespace-nowrap" title={`${caseItem.name} - ${caseItem.charges}`}>
         <div className="font-medium text-gray-900">{caseItem.name}</div>
         <div className="text-sm text-gray-500">{caseItem.charges}</div>
@@ -312,12 +311,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
     return '';
   };
 
-  const handleSort = (key: SortKey) => {
-    let direction: SortDirection = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
+  // Cập nhật hàm handleSort để nhận cả key và direction
+  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const [key, direction] = e.target.value.split(':');
+    setSortConfig({ key: key as SortKey, direction: direction as SortDirection });
   };
 
   const sortedCases = useMemo(() => {
@@ -329,24 +326,24 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
         switch (sortConfig.key) {
           case 'isImportant':
-            aValue = a.isImportant ? 1 : 0;
+            aValue = a.isImportant ? 1 : 0; // 1 nếu quan trọng, 0 nếu không
             bValue = b.isImportant ? 1 : 0;
             break;
-          case 'investigationRemaining':
+          case 'createdAt': // Mới thêm vào
+            aValue = new Date(a.createdAt).getTime();
+            bValue = new Date(b.createdAt).getTime();
+            break;
+          case 'investigationDeadline': // Hạn điều tra
             aValue = getDaysRemaining(a.investigationDeadline);
             bValue = getDaysRemaining(b.investigationDeadline);
             break;
-          case 'shortestDetentionRemaining':
+          case 'shortestDetentionRemaining': // Hạn tạm giam (gần nhất)
             const aDetainedDefs = a.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
             const bDetainedDefs = b.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
             aValue = aDetainedDefs.length > 0 ? Math.min(...aDetainedDefs.map(d => getDaysRemaining(d.detentionDeadline!))) : Infinity;
             bValue = bDetainedDefs.length > 0 ? Math.min(...bDetainedDefs.map(d => getDaysRemaining(b.detentionDeadline!))) : Infinity;
             break;
-          case 'createdAt':
-            aValue = new Date(a.createdAt).getTime();
-            bValue = new Date(b.createdAt).getTime();
-            break;
-          default:
+          default: // Sắp xếp theo tên vụ án hoặc các trường khác
             aValue = a[sortConfig.key as keyof Case];
             bValue = b[sortConfig.key as keyof Case];
             if (typeof aValue === 'string') aValue = aValue.toLowerCase();
@@ -367,67 +364,69 @@ const CaseTable: React.FC<CaseTableProps> = ({
   }, [cases, sortConfig]);
 
   // Chiều rộng ước tính của các cột sticky (để tính toán left offset)
-  // px-6 py-3: padding (1.5rem = 24px mỗi bên) => tổng 48px padding ngang
-  // Mở rộng: icon 20px + padding => khoảng 20px + 2*24px = 68px. Để an toàn, dùng 72px (w-18)
-  // Quan trọng: icon 20px + padding => khoảng 20px + 2*24px = 68px. Để an toàn, dùng 72px (w-18)
-  // Tên Vụ án: w-48 (192px) + padding => 192px + 2*24px = 240px.
-
-  const EXPAND_COL_WIDTH = 72; // width of 'Mở rộng' column (approx px value of w-18)
-  const IMPORTANT_COL_WIDTH = 72; // width of 'Quan trọng' column (approx px value of w-18)
-  const NAME_COL_WIDTH = 240; // width of 'Tên Vụ án' column (approx px value of w-48 with padding)
-
+  const EXPAND_COL_WIDTH = 72; // w-18 ~ 72px
+  const IMPORTANT_COL_WIDTH = 72; // w-18 ~ 72px
+  const NAME_COL_WIDTH = 240; // w-48 ~ 192px + padding (2*24px) = 240px
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      {/* Ô sắp xếp riêng */}
+      <div className="p-4 bg-gray-100 border-b border-gray-200 flex items-center justify-between">
+        <h3 className="text-lg font-medium text-gray-800">Danh sách Vụ án</h3>
+        <div className="flex items-center gap-2">
+          <label htmlFor="sort-by" className="text-sm font-medium text-gray-700">Sắp xếp theo:</label>
+          <select
+            id="sort-by"
+            className="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+            value={`${sortConfig.key || ''}:${sortConfig.direction || ''}`}
+            onChange={handleSortChange}
+          >
+            <option value="">-- Chọn --</option>
+            <option value="createdAt:desc">Mới thêm vào (Mới nhất)</option>
+            <option value="createdAt:asc">Mới thêm vào (Cũ nhất)</option>
+            <option value="investigationDeadline:asc">Hạn điều tra (Sớm nhất)</option>
+            <option value="investigationDeadline:desc">Hạn điều tra (Muộn nhất)</option>
+            <option value="shortestDetentionRemaining:asc">Hạn tạm giam (Gần nhất)</option>
+            <option value="shortestDetentionRemaining:desc">Hạn tạm giam (Xa nhất)</option>
+            <option value="isImportant:desc">Các vụ quan trọng (Trước)</option>
+            <option value="name:asc">Tên vụ án (A-Z)</option>
+            <option value="name:desc">Tên vụ án (Z-A)</option>
+            <option value="stage:asc">Giai đoạn (A-Z)</option> {/* Thêm sắp xếp theo giai đoạn */}
+          </select>
+        </div>
+      </div>
+
       {/* Bao bọc toàn bộ bảng để thanh cuộn ngang áp dụng cho cả header và body */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th
-                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-30 w-18" // w-18 ~ 72px
-                style={{ minWidth: EXPAND_COL_WIDTH }} // Đảm bảo chiều rộng tối thiểu
+                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-30 w-18"
+                style={{ minWidth: EXPAND_COL_WIDTH }}
               >
                 Mở rộng
               </th>
               <th
-                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer sticky left-[72px] bg-gray-50 z-30 w-18" // left = EXPAND_COL_WIDTH
-                style={{ minWidth: IMPORTANT_COL_WIDTH }} // Đảm bảo chiều rộng tối thiểu
-                onClick={() => handleSort('isImportant')}
+                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[72px] bg-gray-50 z-30 w-18"
+                style={{ minWidth: IMPORTANT_COL_WIDTH }}
               >
-                <div className="flex items-center gap-1">
-                  Quan trọng
-                  {sortConfig.key === 'isImportant' && (
-                    sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                  )}
-                </div>
+                Quan trọng
               </th>
               {columns.map((column) => {
                 if (column.key === 'isImportant') return null; // Không render lại cột này ở đây
-
-                const isSortable = column.sortable !== false &&
-                  (column.key === 'createdAt' || // Mới thêm vào
-                   column.key === 'investigationDeadline' || // Hạn điều tra
-                   column.key === 'shortestDetentionRemaining' || // Hạn tạm giam (tính toán)
-                   column.key === 'name' || // Tên vụ án
-                   column.key === 'stage' // Giai đoạn
-                   );
+                // Bỏ `cursor-pointer` và `onClick` trên `<th>`
+                // Sắp xếp đã được xử lý bằng ô `select` riêng.
 
                 // Đặc biệt xử lý cột 'name' để nó cũng sticky
                 if (column.key === 'name') {
                   return (
                     <th
                       key={column.key}
-                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isSortable ? 'cursor-pointer' : ''} sticky left-[144px] bg-gray-50 z-20`} // left = EXPAND_COL_WIDTH + IMPORTANT_COL_WIDTH
-                      style={{ minWidth: NAME_COL_WIDTH }} // Đảm bảo chiều rộng tối thiểu
-                      onClick={() => isSortable && handleSort(column.key as SortKey)}
+                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[144px] bg-gray-50 z-20`}
+                      style={{ minWidth: NAME_COL_WIDTH }}
                     >
-                      <div className="flex items-center gap-1">
-                        {column.label}
-                        {sortConfig.key === column.key && (
-                          sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                        )}
-                      </div>
+                      {column.label}
                     </th>
                   );
                 }
@@ -436,15 +435,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 return (
                   <th
                     key={column.key}
-                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isSortable ? 'cursor-pointer' : ''}`}
-                    onClick={() => isSortable && handleSort(column.key as SortKey)}
+                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
                   >
-                    <div className="flex items-center gap-1">
-                      {column.label}
-                      {sortConfig.key === column.key && (
-                        sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                      )}
-                    </div>
+                    {column.label}
                   </th>
                 );
               })}
@@ -462,7 +455,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 <React.Fragment key={caseItem.id}>
                   <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
                     <td
-                      className="px-2 py-4 whitespace-nowrap sticky left-0 bg-white z-20" // z-index thấp hơn thead, cao hơn body bình thường
+                      className="px-2 py-4 whitespace-nowrap sticky left-0 bg-white z-20"
                       style={{ minWidth: EXPAND_COL_WIDTH }}
                     >
                       <button
@@ -477,7 +470,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       </button>
                     </td>
                     <td
-                      className="px-2 py-4 text-sm text-gray-900 sticky left-[72px] bg-white z-20" // left = EXPAND_COL_WIDTH
+                      className="px-2 py-4 text-sm text-gray-900 sticky left-[72px] bg-white z-20"
                       style={{ minWidth: IMPORTANT_COL_WIDTH }}
                     >
                       {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
@@ -488,7 +481,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                          return (
                            <td
                              key={column.key}
-                             className="px-6 py-4 text-sm text-gray-900 sticky left-[144px] bg-white z-10" // left = EXPAND_COL_WIDTH + IMPORTANT_COL_WIDTH
+                             className="px-6 py-4 text-sm text-gray-900 sticky left-[144px] bg-white z-10"
                              style={{ minWidth: NAME_COL_WIDTH }}
                            >
                              {renderCellContent(caseItem, column)}
