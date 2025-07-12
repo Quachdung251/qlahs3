@@ -66,7 +66,7 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
   };
 
   const handlePrintReport = () => {
-    if (reportContentRef.current && qrImageUrl) { // Đảm bảo qrImageUrl đã có
+    if (qrImageUrl) { // Đảm bảo qrImageUrl đã có
       const printWindow = window.open('', '', 'height=800,width=800');
       if (printWindow) {
         let defendantsHtml = '';
@@ -86,10 +86,14 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
           defendantsHtml += `</div>`;
         }
 
-
         const printContent = `
-          <div class="report-container" style="max-width: 190mm; margin: auto; padding: 10mm; border: 1px solid #ccc; box-sizing: border-box; font-size: 0.9em;">
-            <h2 style="font-size: 1.4em; font-weight: bold; text-align: center; margin-bottom: 15px;">THÔNG TIN VỤ ÁN</h2>
+          <div class="report-container" style="position: relative; width: 190mm; min-height: 277mm; margin: auto; padding: 15mm; box-sizing: border-box; font-size: 10pt; line-height: 1.4;">
+            <h2 style="font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 15px;">THÔNG TIN VỤ ÁN</h2>
+
+            <div class="qr-code-print-container" style="position: absolute; top: 15mm; right: 15mm; text-align: center;">
+              <img src="${qrImageUrl}" alt="Mã QR Vụ án" style="width: 80px; height: 80px; border: 1px solid #ccc; padding: 2px; display: block; margin: 0 auto;">
+              <p style="font-size: 8pt; color: #666; margin-top: 5px;">ID Vụ án: ${caseItem.id}</p>
+            </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; margin-bottom: 15px;">
               <div style="display: flex; align-items: flex-start;">
@@ -119,20 +123,18 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
             </div>
 
             ${defendantsHtml}
-
-            <div class="qr-code-container" style="text-align: center; margin-top: 20px;">
-              <h3 style="font-size: 1.1em; font-weight: bold; margin-bottom: 5px;">Mã QR Vụ án</h3>
-              <img src="${qrImageUrl}" alt="QR Code Vụ án" style="width: 80px; height: 80px; border: 1px solid #ccc; padding: 2px; display: block; margin: 0 auto;">
-              <p style="font-size: 0.8em; color: #666; margin-top: 5px;">ID Vụ án: ${caseItem.id}</p>
-            </div>
           </div>
         `;
 
         printWindow.document.write('<html><head><title>Báo cáo Vụ án</title>');
         printWindow.document.write(`
           <style>
+            @page {
+              size: A4;
+              margin: 0;
+            }
             body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
-            .report-container { width: 210mm; min-height: 297mm; margin: 0; padding: 15mm; box-sizing: border-box; font-size: 10pt; line-height: 1.4; }
+            .report-container { width: 210mm; min-height: 297mm; margin: 0; padding: 15mm; box-sizing: border-box; font-size: 10pt; line-height: 1.4; position: relative; }
             h2 { font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 15px; }
             h3 { font-size: 12pt; font-weight: bold; margin-bottom: 10px; }
             .info-row { display: flex; margin-bottom: 5px; }
@@ -140,8 +142,8 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
             .info-value { flex-grow: 1; }
             .defendant-section { margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px; }
             .defendant-item { border: 1px solid #eee; padding: 8px; margin-bottom: 8px; border-radius: 4px; }
-            .qr-code-container { text-align: center; margin-top: 20px; }
-            .qr-code-container img { display: block; margin: 0 auto; } /* Center image */
+            .qr-code-print-container { position: absolute; top: 15mm; right: 15mm; text-align: center; }
+            .qr-code-print-container img { display: block; margin: 0 auto; } /* Center image */
             @media print {
               body { -webkit-print-color-adjust: exact; }
               .no-print { display: none; }
@@ -161,6 +163,7 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
     } else {
       console.error("Không thể in báo cáo: Mã QR chưa được tạo hoặc nội dung báo cáo không có sẵn.");
       // Có thể hiển thị một thông báo lỗi cho người dùng ở đây
+      alert("Không thể tạo báo cáo. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
     }
   };
 
