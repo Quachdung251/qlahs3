@@ -3,32 +3,30 @@ import React, { useEffect, useRef } from 'react';
 import { X, Printer } from 'lucide-react';
 import { createPrintableQrHtml } from '../utils/qrUtils';
 import { Case } from '../types'; // Import Case interface
+import QRCode from 'qrcode'; // Import qrcode từ npm package
 
 interface QRCodeDisplayModalProps {
   caseData: Case; // Thay đổi prop để nhận toàn bộ đối tượng Case
   onClose: () => void;
 }
 
-const QRCodeDisplayModal: React.FC<QRCodeDisplayModalProps> = ({ caseData, onClose }) => {
+const QRCodeDisplayModal: React.FC<QRCodeDisplayModalModalProps> = ({ caseData, onClose }) => {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Hàm để render QR code vào canvas
   useEffect(() => {
     if (qrCanvasRef.current && caseData.id) {
-      // Import qrcode.js dynamicallly to avoid global pollution and ensure it's loaded
-      import('qrcode.js').then((QRCodeModule) => {
-        const QRCode = QRCodeModule.default; // qrcode.js exports QRCode as default
-        // Clear previous QR code if any
-        qrCanvasRef.current.innerHTML = '';
-        new QRCode(qrCanvasRef.current, {
-          text: JSON.stringify({ id: caseData.id, name: caseData.name }), // QR code chỉ cần id và tên để quét nhanh
-          width: 180, // Kích thước hiển thị trong modal
-          height: 180,
-          colorDark: "#000000",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.H
-        });
-      }).catch(error => console.error("Failed to load qrcode.js", error));
+      const qrValue = JSON.stringify({ id: caseData.id, name: caseData.name }); // QR code chỉ cần id và tên để quét nhanh
+      QRCode.toCanvas(qrCanvasRef.current, qrValue, {
+        width: 180, // Kích thước hiển thị trong modal
+        margin: 1, // Khoảng trắng xung quanh QR
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      }, function (error) {
+        if (error) console.error(error);
+      });
     }
   }, [caseData]);
 
@@ -39,9 +37,9 @@ const QRCodeDisplayModal: React.FC<QRCodeDisplayModalProps> = ({ caseData, onClo
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
-      // setTimeout is used in createPrintableQrHtml to ensure QR renders before print
+      // setTimeout được sử dụng trong createPrintableQrHtml để đảm bảo QR render trước khi in
     } else {
-      console.error("Could not open print window. Pop-ups might be blocked.");
+      console.error("Không thể mở cửa sổ in. Có thể pop-up đã bị chặn.");
     }
   };
 
