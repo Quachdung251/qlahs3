@@ -1,27 +1,32 @@
 // ./components/CaseTable.tsx
-import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer } from 'lucide-react'; // THÊM Printer icon
+import React, { useState, useMemo } from 'react'; // THÊM useMemo
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react'; // THÊM Printer, ArrowUp, ArrowDown icons
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 import NotesModal from './NotesModal';
 import ExtensionModal from './ExtensionModal';
-import QRCodeDisplayModal from './QRCodeDisplayModal'; // Import modal hiển thị QR
-import { generateQrCodeData } from '../utils/qrUtils'; // Import hàm tiện ích
+import QRCodeDisplayModal from './QRCodeDisplayModal';
+import { generateQrCodeData } from '../utils/qrUtils';
 
 interface CaseTableProps {
   cases: Case[];
   columns: {
-    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant'; // THÊM 'isImportant' vào key
+    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant';
     label: string;
     render?: (caseItem: Case) => React.ReactNode;
+    sortable?: boolean; // THÊM PROP sortable
   }[];
   onDeleteCase: (caseId: string) => void;
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onUpdateCase: (updatedCase: Case) => void;
   onEditCase: (caseItem: Case) => void;
-  onToggleImportant: (caseId: string, isImportant: boolean) => void; // CẬP NHẬT PROP NÀY để truyền trạng thái mới
+  onToggleImportant: (caseId: string, isImportant: boolean) => void;
   showWarnings?: boolean;
 }
+
+// Định nghĩa kiểu cho trạng thái sắp xếp
+type SortKey = keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'isImportant';
+type SortDirection = 'asc' | 'desc';
 
 const CaseTable: React.FC<CaseTableProps> = ({
   cases,
@@ -30,7 +35,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
   onTransferStage,
   onUpdateCase,
   onEditCase,
-  onToggleImportant, // NHẬN PROP MỚI
+  onToggleImportant,
   showWarnings = false
 }) => {
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
@@ -43,9 +48,14 @@ const CaseTable: React.FC<CaseTableProps> = ({
     defendant?: Defendant;
   } | null>(null);
 
-  // State mới cho modal hiển thị QR Code
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
+
+  // State cho sắp xếp
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey | null; direction: SortDirection | null }>({
+    key: null,
+    direction: null,
+  });
 
   const toggleExpanded = (caseId: string) => {
     const newExpanded = new Set(expandedCases);
@@ -67,7 +77,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
     setExpandedActions(newExpanded);
   };
 
-  // Hàm xử lý in nhãn QR Code cho vụ án hiện có
   const handlePrintExistingQR = (caseItem: Case) => {
     const qrValue = generateQrCodeData(caseItem);
     setQrCaseData({ qrValue, caseName: caseItem.name });
@@ -116,7 +125,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         break;
     }
 
-    // Add other actions for active stages
     if (!['Hoàn thành', 'Đình chỉ', 'Chuyển đi'].includes(caseItem.stage)) {
       actions.push(
         <button
@@ -143,7 +151,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => setConfirmDelete(caseItem.id)} // Đã chuyển nút xóa vào đây
+          onClick={() => setConfirmDelete(caseItem.id)}
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
@@ -152,7 +160,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
       );
     }
 
-    // Thêm nút In nhãn QR Code vào danh sách hành động
     actions.push(
       <button
         key="print-qr"
@@ -170,13 +177,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   const renderCaseNameCell = (caseItem: Case) => {
     return (
-      <div className="max-w-xs">
-        <div className="font-medium text-gray-900 truncate" title={caseItem.name}>
-          {caseItem.name}
-        </div>
-        <div className="text-sm text-gray-500 truncate" title={caseItem.charges}>
-          {caseItem.charges}
-        </div>
+      <div className="max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={`${caseItem.name} - ${caseItem.charges}`}> {/* THÊM title */}
+        <div className="font-medium text-gray-900">{caseItem.name}</div>
+        <div className="text-sm text-gray-500">{caseItem.charges}</div>
       </div>
     );
   };
@@ -193,10 +196,8 @@ const CaseTable: React.FC<CaseTableProps> = ({
           Ghi chú
         </button>
         {caseItem.notes && (
-          <div className="max-w-xs">
-            <div className="text-sm text-gray-600 truncate" title={caseItem.notes}>
-              {caseItem.notes}
-            </div>
+          <div className="max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={caseItem.notes}> {/* THÊM title */}
+            <div className="text-sm text-gray-600">{caseItem.notes}</div>
           </div>
         )}
       </div>
@@ -224,10 +225,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return `${shortestDetentionDays} ngày`;
       case 'notes':
         return renderNotesCell(caseItem);
-      case 'isImportant': // THÊM CASE NÀY
+      case 'isImportant':
         return (
           <button
-            onClick={() => onToggleImportant(caseItem.id, !caseItem.isImportant)} // CẬP NHẬT onToggleImportant
+            onClick={() => onToggleImportant(caseItem.id, !caseItem.isImportant)}
             className={`p-1 rounded-full transition-colors ${
               caseItem.isImportant ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-500'
             }`}
@@ -243,7 +244,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return (
           <div className="relative">
             <div className="flex items-center gap-1">
-              {/* Always show Edit button, now calling onEditCase prop */}
               <button
                 onClick={() => onEditCase(caseItem)}
                 className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
@@ -252,21 +252,18 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 Sửa
               </button>
 
-              {/* Extension button for investigation stage */}
               {caseItem.stage === 'Điều tra' && (
                 <button
                   onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
-                  className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowerep"
                 >
                   <Clock size={12} />
                   Gia hạn ĐT
                 </button>
               )}
 
-              {/* Show first action if available */}
               {stageActions.length > 0 && stageActions[0]}
 
-              {/* More actions button if there are additional actions (excluding the first one) */}
               {stageActions.length > 1 && (
                 <button
                   onClick={() => toggleActions(caseItem.id)}
@@ -277,11 +274,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
               )}
             </div>
 
-            {/* Expanded actions dropdown */}
             {isExpanded && stageActions.length > 1 && (
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-max">
                 <div className="p-2 space-y-1">
-                  {/* Render all actions except the first one, which is already displayed */}
                   {stageActions.slice(1).map((action, index) => (
                     <div key={index} className="block">
                       {action}
@@ -296,17 +291,16 @@ const CaseTable: React.FC<CaseTableProps> = ({
         if (column.render) {
           return column.render(caseItem);
         }
-        // Fallback for direct key access, ensuring it's a string or number
         const value = caseItem[column.key as keyof Case];
         return typeof value === 'string' || typeof value === 'number' ? value : '';
     }
   };
 
   const isRowHighlighted = (caseItem: Case) => {
-    if (caseItem.isImportant) { // Highlight if important
+    if (caseItem.isImportant) {
       return 'bg-blue-50';
     }
-    if (showWarnings) { // Highlight if expiring soon
+    if (showWarnings) {
       if (caseItem.stage === 'Điều tra' && isExpiringSoon(caseItem.investigationDeadline)) {
         return 'bg-yellow-50';
       }
@@ -316,44 +310,126 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return 'bg-yellow-50';
       }
     }
-    return ''; // No highlight
+    return '';
   };
+
+  // Hàm xử lý sắp xếp
+  const handleSort = (key: SortKey) => {
+    let direction: SortDirection = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Áp dụng sắp xếp vào danh sách cases
+  const sortedCases = useMemo(() => {
+    let sortableCases = [...cases];
+    if (sortConfig.key) {
+      sortableCases.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortConfig.key) {
+          case 'isImportant':
+            aValue = a.isImportant ? 1 : 0;
+            bValue = b.isImportant ? 1 : 0;
+            break;
+          case 'investigationRemaining':
+            aValue = getDaysRemaining(a.investigationDeadline);
+            bValue = getDaysRemaining(b.investigationDeadline);
+            break;
+          case 'shortestDetentionRemaining':
+            const aDetainedDefs = a.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+            const bDetainedDefs = b.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
+            aValue = aDetainedDefs.length > 0 ? Math.min(...aDetainedDefs.map(d => getDaysRemaining(d.detentionDeadline!))) : Infinity;
+            bValue = bDetainedDefs.length > 0 ? Math.min(...bDetainedDefs.map(d => getDaysRemaining(d.detentionDeadline!))) : Infinity;
+            break;
+          case 'createdAt': // Sắp xếp theo ngày tạo (mới thêm vào)
+            aValue = new Date(a.createdAt).getTime();
+            bValue = new Date(b.createdAt).getTime();
+            break;
+          default:
+            aValue = a[sortConfig.key as keyof Case];
+            bValue = b[sortConfig.key as keyof Case];
+            if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+            if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+            break;
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableCases;
+  }, [cases, sortConfig]);
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto"> {/* Thêm div để tạo thanh cuộn ngang */}
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20"> {/* Sticky cho cột đầu tiên */}
                 Mở rộng
               </th>
-              {/* THÊM CỘT MỚI CHO STAR */}
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Quan trọng
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                onClick={() => handleSort('isImportant')}
+              >
+                <div className="flex items-center gap-1">
+                  Quan trọng
+                  {sortConfig.key === 'isImportant' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  )}
+                </div>
               </th>
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  {column.label}
-                </th>
-              ))}
+              {columns.map((column) => {
+                // Bỏ qua cột 'isImportant' và 'actions' vì chúng đã được render riêng hoặc không cần sắp xếp trực tiếp từ tiêu đề
+                if (column.key === 'isImportant' || column.key === 'actions' || column.key === 'notes') {
+                  return (
+                    <th
+                      key={column.key}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      {column.label}
+                    </th>
+                  );
+                }
+                return (
+                  <th
+                    key={column.key}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => column.sortable !== false && handleSort(column.key as SortKey)} // Chỉ sắp xếp nếu sortable không phải false
+                  >
+                    <div className="flex items-center gap-1">
+                      {column.label}
+                      {sortConfig.key === column.key && (
+                        sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {cases.length === 0 ? (
+            {sortedCases.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + 2} className="text-center py-8 text-gray-500">
                   Không có vụ án nào để hiển thị.
                 </td>
               </tr>
             ) : (
-              cases.map((caseItem) => (
+              sortedCases.map((caseItem) => (
                 <React.Fragment key={caseItem.id}>
                   <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white z-10"> {/* Sticky cho cột đầu tiên */}
                       <button
                         onClick={() => toggleExpanded(caseItem.id)}
                         className="text-gray-500 hover:text-gray-700"
@@ -365,19 +441,22 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         )}
                       </button>
                     </td>
-                    {/* RENDER NÚT STAR */}
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
                     </td>
-                    {columns.map((column) => (
-                      <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
-                        {renderCellContent(caseItem, column)}
-                      </td>
-                    ))}
+                    {columns.map((column) => {
+                       // Bỏ qua cột 'isImportant' vì nó đã được render riêng
+                      if (column.key === 'isImportant') return null;
+                      return (
+                        <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
+                          {renderCellContent(caseItem, column)}
+                        </td>
+                      );
+                    })}
                   </tr>
                   {expandedCases.has(caseItem.id) && (
                     <tr>
-                      <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50"> {/* CỘT +2 (mở rộng + quan trọng) */}
+                      <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-2">
                           <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                           {caseItem.defendants.map((defendant, index) => (
