@@ -192,20 +192,25 @@ export const createPrintableQrHtml = (caseData: Case): string => {
       </div>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.0.0/qrcode.min.js"></script>
       <script>
-        var qrcode = new QRCode(document.getElementById("qrCanvasPrint"), {
-          text: "${qrCodeValue}",
-          width: 150,
-          height: 150,
-          colorDark : "#000000",
-          colorLight : "#ffffff",
-          correctLevel : QRCode.CorrectLevel.H
+        // Đảm bảo DOM đã sẵn sàng trước khi render QR
+        document.addEventListener('DOMContentLoaded', function() {
+          var qrcode = new QRCode(document.getElementById("qrCanvasPrint"), {
+            text: "${qrCodeValue}",
+            width: 150,
+            height: 150,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+          });
+          // Kích hoạt in sau khi QR code được render
+          // Sử dụng setTimeout để đảm bảo trình duyệt có đủ thời gian vẽ QR lên canvas
+          setTimeout(function() {
+            window.print();
+            window.onafterprint = function() {
+              window.close(); // Đóng cửa sổ/tab sau khi in
+            };
+          }, 500); // Đợi 500ms để QR code chắc chắn được vẽ
         });
-        setTimeout(function() {
-          window.print();
-          window.onafterprint = function() {
-            window.close();
-          };
-        }, 500);
       </script>
     </body>
     </html>
