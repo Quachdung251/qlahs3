@@ -1,82 +1,111 @@
 // src/components/QRCodeDisplayModal.tsx
-import React, { useRef } from 'react';
-import { QRCodeCanvas } from 'qrcode.react'; // ĐẢM BẢO DÒNG NÀY LÀ ĐÚNG: Import QRCodeCanvas là named export
-import { Download, Printer, X } from 'lucide-react';
-import { createPrintableQrHtml } from '../utils/qrUtils'; // Import hàm tiện ích
+import React, { useEffect, useRef } from 'react';
+import { X, Printer } from 'lucide-react';
+import { createPrintableQrHtml } from '../utils/qrUtils';
+import { Case } from '../types'; // Import Case interface
 
 interface QRCodeDisplayModalProps {
-  qrCodeValue: string;
-  caseName: string;
+  caseData: Case; // Thay đổi prop để nhận toàn bộ đối tượng Case
   onClose: () => void;
 }
 
-const QRCodeDisplayModal: React.FC<QRCodeDisplayModalProps> = ({ qrCodeValue, caseName, onClose }) => {
-  const qrCodeRef = useRef<HTMLCanvasElement>(null);
+const QRCodeDisplayModal: React.FC<QRCodeDisplayModalProps> = ({ caseData, onClose }) => {
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const handleDownloadQR = () => {
-    if (qrCodeRef.current) {
-      const canvas = qrCodeRef.current;
-      const url = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `qr_code_${caseName.replace(/\s/g, '_')}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  // Hàm để render QR code vào canvas
+  useEffect(() => {
+    if (qrCanvasRef.current && caseData.id) {
+      // Import qrcode.js dynamicallly to avoid global pollution and ensure it's loaded
+      import('qrcode.js').then((QRCodeModule) => {
+        const QRCode = QRCodeModule.default; // qrcode.js exports QRCode as default
+        // Clear previous QR code if any
+        qrCanvasRef.current.innerHTML = '';
+        new QRCode(qrCanvasRef.current, {
+          text: JSON.stringify({ id: caseData.id, name: caseData.name }), // QR code chỉ cần id và tên để quét nhanh
+          width: 180, // Kích thước hiển thị trong modal
+          height: 180,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }).catch(error => console.error("Failed to load qrcode.js", error));
     }
-  };
+  }, [caseData]);
 
-  const handlePrintQR = () => {
+  const handlePrint = () => {
+    // Sử dụng hàm createPrintableQrHtml mới để tạo nội dung in
+    const printContent = createPrintableQrHtml(caseData);
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      const htmlContent = createPrintableQrHtml(qrCodeValue, caseName);
-      printWindow.document.write(htmlContent);
+      printWindow.document.write(printContent);
       printWindow.document.close();
+      // setTimeout is used in createPrintableQrHtml to ensure QR renders before print
+    } else {
+      console.error("Could not open print window. Pop-ups might be blocked.");
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-auto relative">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 transition-colors"
-          aria-label="Đóng"
-        >
-          <X size={20} />
-        </button>
-        <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">Mã QR Vụ Án Mới</h3>
-        <div className="flex justify-center mb-6">
-          {/* QRCodeCanvas component để hiển thị trong modal */}
-          <QRCodeCanvas // SỬ DỤNG QRCodeCanvas
-            value={qrCodeValue}
-            size={180}
-            level="H"
-            includeMargin={true}
-            renderAs="canvas"
-            ref={qrCodeRef}
-            className="rounded-md shadow-sm"
-          />
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-2xl font-bold text-gray-800">Mã QR Hồ Sơ Vụ Án</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X size={24} />
+          </button>
         </div>
-        <p className="text-center text-gray-700 text-lg font-medium mb-4">{caseName}</p>
-        <p className="text-center text-sm text-gray-500 mb-6">
-          Mã QR này chứa thông tin định danh của vụ án.
-        </p>
-        <div className="flex justify-center gap-4">
-          <button
-            onClick={handleDownloadQR}
-            className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-md"
-          >
-            <Download size={18} />
-            Tải QR Code
-          </button>
-          <button
-            onClick={handlePrintQR}
-            className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors font-medium shadow-md"
-          >
-            <Printer size={18} />
-            In Nhãn (4x3 cm)
-          </button>
+
+        <div className="p-6 flex flex-col items-center">
+          <div className="mb-6 border p-4 rounded-lg bg-gray-50 flex flex-col items-center">
+            <canvas ref={qrCanvasRef} className="w-[180px] h-[180px]"></canvas>
+            <p className="text-sm text-gray-600 mt-2">Quét mã này để xem chi tiết hồ sơ</p>
+          </div>
+
+          <div className="w-full text-left bg-blue-50 p-4 rounded-lg mb-6">
+            <h3 className="text-lg font-semibold text-blue-800 mb-3">Thông tin vụ án:</h3>
+            <p className="text-sm text-gray-800 mb-1"><strong>Tên vụ án:</strong> {caseData.name}</p>
+            <p className="text-sm text-gray-800 mb-1"><strong>Tội danh:</strong> {caseData.charges}</p>
+            <p className="text-sm text-gray-800 mb-1"><strong>KSV phụ trách:</strong> {caseData.prosecutor}</p>
+            <p className="text-sm text-gray-800 mb-1"><strong>Giai đoạn:</strong> {caseData.stage}</p>
+            <p className="text-sm text-gray-800 mb-1"><strong>Thời hạn ĐT:</strong> {caseData.investigationDeadline}</p>
+            {caseData.notes && <p className="text-sm text-gray-800 mb-1"><strong>Ghi chú:</strong> {caseData.notes}</p>}
+          </div>
+
+          {caseData.defendants && caseData.defendants.length > 0 && (
+            <div className="w-full text-left bg-green-50 p-4 rounded-lg mb-6">
+              <h3 className="text-lg font-semibold text-green-800 mb-3">Thông tin bị can:</h3>
+              {caseData.defendants.map((defendant, index) => (
+                <div key={defendant.id || index} className="mb-3 pb-3 border-b border-green-200 last:border-b-0 last:mb-0 last:pb-0">
+                  <p className="text-sm text-gray-800 mb-1"><strong>Bị can {index + 1}:</strong> {defendant.name}</p>
+                  <p className="text-sm text-gray-800 mb-1 ml-4"><strong>Tội danh:</strong> {defendant.charges}</p>
+                  <p className="text-sm text-gray-800 mb-1 ml-4"><strong>Biện pháp:</strong> {defendant.preventiveMeasure}</p>
+                  {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
+                    <p className="text-sm text-gray-800 mb-1 ml-4"><strong>Hạn tạm giam:</strong> {defendant.detentionDeadline}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-center gap-4 mt-4">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+            >
+              <Printer size={20} />
+              In Hồ Sơ
+            </button>
+            <button
+              onClick={onClose}
+              className="flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors font-medium"
+            >
+              <X size={20} />
+              Đóng
+            </button>
+          </div>
         </div>
       </div>
     </div>
