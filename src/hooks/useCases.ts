@@ -57,18 +57,25 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
 
   // Load cases from IndexedDB on mount
   useEffect(() => {
-    if (!isDBInitialized) return;
+    if (!isDBInitialized) {
+      console.log('IndexedDB not initialized yet, skipping case load.');
+      return;
+    }
 
     const loadCases = async () => {
+      setIsLoading(true);
+      console.log('Attempting to load cases from IndexedDB...');
       try {
         const savedCases = await dbManager.loadData<Case>('cases');
+        console.log('Cases loaded from IndexedDB:', savedCases);
         // Sắp xếp các vụ án ngay sau khi tải
         setCases(sortCases(savedCases));
       } catch (error) {
-        console.error('Failed to load cases:', error);
+        console.error('Failed to load cases from IndexedDB:', error);
         // Fallback to localStorage (consider removing localStorage fallback if IndexedDB is primary)
         const fallbackCases = localStorage.getItem(`legalCases_${userKey}`);
         if (fallbackCases) {
+          console.warn('Falling back to localStorage for cases.');
           setCases(sortCases(JSON.parse(fallbackCases))); // Sắp xếp cả dữ liệu từ localStorage
         }
       } finally {
@@ -82,15 +89,20 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
   // Save cases to IndexedDB whenever cases change
   useEffect(() => {
     // Chỉ lưu khi DB đã khởi tạo và không trong trạng thái loading ban đầu
-    if (!isDBInitialized || isLoading) return;
+    if (!isDBInitialized || isLoading) {
+      console.log('Skipping case save: DB not initialized or still loading.');
+      return;
+    }
 
     const saveCases = async () => {
+      console.log('Attempting to save cases to IndexedDB:', cases.length, 'cases.');
       try {
         await dbManager.saveData('cases', cases);
+        console.log('Cases saved to IndexedDB successfully.');
         // Also save to localStorage as backup (consider removing localStorage fallback if IndexedDB is primary)
         localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
       } catch (error) {
-        console.error('Failed to save cases:', error);
+        console.error('Failed to save cases to IndexedDB:', error);
         // Fallback to localStorage
         localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(cases));
       }
@@ -106,6 +118,7 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
 
   const addCase = useCallback(async (caseData: CaseFormData): Promise<Case> => {
     if (!isDBInitialized) {
+      console.error("IndexedDB not initialized when trying to add case.");
       throw new Error("Database not initialized.");
     }
     const newCase: Case = {
@@ -120,26 +133,31 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
       isImportant: false // Mặc định là không quan trọng
     };
 
+    console.log("Attempting to add new case to dbManager:", newCase);
     try {
       await dbManager.addData('cases', newCase); // Sử dụng addData để thêm mới
+      console.log("Case successfully added via dbManager.addData.");
       setCases(prev => sortCases([...prev, newCase])); // Sắp xếp lại sau khi thêm
       return newCase; // TRẢ VỀ ĐỐI TƯỢNG VỤ ÁN ĐÃ THÊM
     } catch (error: any) {
-      console.error("Error adding case to IndexedDB:", error);
+      console.error("Error adding case to IndexedDB via dbManager.addData:", error);
       throw new Error(`Failed to add case: ${error.message || 'Unknown error'}`);
     }
   }, [isDBInitialized]); // Thêm isDBInitialized vào dependencies
 
   const updateCase = useCallback(async (updatedCase: Case): Promise<Case> => {
     if (!isDBInitialized) {
+      console.error("IndexedDB not initialized when trying to update case.");
       throw new Error("Database not initialized.");
     }
+    console.log("Attempting to update case via dbManager:", updatedCase);
     try {
       await dbManager.updateData('cases', updatedCase.id, updatedCase); // Sử dụng updateData để cập nhật
+      console.log("Case successfully updated via dbManager.updateData.");
       setCases(prev => sortCases(prev.map(c => c.id === updatedCase.id ? updatedCase : c))); // Sắp xếp lại sau khi cập nhật
       return updatedCase; // TRẢ VỀ ĐỐI TƯỢNG VỤ ÁN ĐÃ CẬP NHẬT
     } catch (error: any) {
-      console.error("Error updating case in IndexedDB:", error);
+      console.error("Error updating case in IndexedDB via dbManager.updateData:", error);
       throw new Error(`Failed to update case: ${error.message || 'Unknown error'}`);
     }
   }, [isDBInitialized]); // Thêm isDBInitialized vào dependencies
@@ -148,11 +166,13 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     if (!isDBInitialized) {
       throw new Error("Database not initialized.");
     }
+    console.log("Attempting to delete case via dbManager:", caseId);
     try {
       await dbManager.deleteData('cases', caseId); // Sử dụng deleteData
+      console.log("Case successfully deleted via dbManager.deleteData.");
       setCases(prev => sortCases(prev.filter(c => c.id !== caseId))); // Sắp xếp lại sau khi xóa
     } catch (error: any) {
-      console.error("Error deleting case from IndexedDB:", error);
+      console.error("Error deleting case from IndexedDB via dbManager.deleteData:", error);
       throw new Error(`Failed to delete case: ${error.message || 'Unknown error'}`);
     }
   }, [isDBInitialized]);
@@ -161,6 +181,7 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     if (!isDBInitialized) {
       throw new Error("Database not initialized.");
     }
+    console.log(`Attempting to transfer stage for case ${caseId} to ${newStage}.`);
     try {
       const caseToUpdate = cases.find(c => c.id === caseId);
       if (!caseToUpdate) {
@@ -176,9 +197,10 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
       }
 
       await dbManager.updateData('cases', updated.id, updated);
+      console.log("Case stage successfully transferred via dbManager.updateData.");
       setCases(prev => sortCases(prev.map(c => c.id === updated.id ? updated : c)));
     } catch (error: any) {
-      console.error("Error transferring case stage in IndexedDB:", error);
+      console.error("Error transferring case stage in IndexedDB via dbManager.updateData:", error);
       throw new Error(`Failed to transfer stage: ${error.message || 'Unknown error'}`);
     }
   }, [cases, isDBInitialized]);
@@ -187,6 +209,7 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     if (!isDBInitialized) {
       throw new Error("Database not initialized.");
     }
+    console.log(`Attempting to toggle importance for case ${caseId}.`);
     try {
       const caseToUpdate = cases.find(c => c.id === caseId);
       if (!caseToUpdate) {
@@ -194,9 +217,10 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
       }
       const updated = { ...caseToUpdate, isImportant: !caseToUpdate.isImportant };
       await dbManager.updateData('cases', updated.id, updated);
+      console.log("Case importance successfully toggled via dbManager.updateData.");
       setCases(prev => sortCases(prev.map(c => c.id === updated.id ? updated : c)));
     } catch (error: any) {
-      console.error("Error toggling important status in IndexedDB:", error);
+      console.error("Error toggling important status in IndexedDB via dbManager.updateData:", error);
       throw new Error(`Failed to toggle importance: ${error.message || 'Unknown error'}`);
     }
   }, [cases, isDBInitialized]);
@@ -236,13 +260,15 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
       return;
     }
     setIsLoading(true);
+    console.log('Attempting to overwrite all cases via dbManager.saveData.');
     try {
       await dbManager.saveData('cases', newCases);
+      console.log('All cases successfully overwritten via dbManager.saveData.');
       setCases(sortCases(newCases));
       localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(newCases));
       console.log('Đã ghi đè tất cả vụ án từ backup thành công.');
     } catch (error: any) {
-      console.error('Lỗi khi ghi đè vụ án từ backup:', error);
+      console.error('Lỗi khi ghi đè vụ án từ backup via dbManager.saveData:', error);
       throw new Error(`Failed to overwrite cases: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
