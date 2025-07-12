@@ -10,8 +10,9 @@ interface QRCodeDisplayModalProps {
   onClose: () => void;
 }
 
-const QRCodeDisplayModal: React.FC<QRCodeDisplayModalModalProps> = ({ caseData, onClose }) => {
+const QRCodeDisplayModal: React.FC<QRCodeDisplayModalProps> = ({ caseData, onClose }) => {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  const printIframeRef = useRef<HTMLIFrameElement>(null); // Thêm ref cho iframe in
 
   // Hàm để render QR code vào canvas
   useEffect(() => {
@@ -31,15 +32,30 @@ const QRCodeDisplayModal: React.FC<QRCodeDisplayModalModalProps> = ({ caseData, 
   }, [caseData]);
 
   const handlePrint = () => {
-    // Sử dụng hàm createPrintableQrHtml mới để tạo nội dung in
     const printContent = createPrintableQrHtml(caseData);
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      // setTimeout được sử dụng trong createPrintableQrHtml để đảm bảo QR render trước khi in
+    const iframe = printIframeRef.current;
+
+    if (iframe) {
+      iframe.contentWindow?.document.open();
+      iframe.contentWindow?.document.write(printContent);
+      iframe.contentWindow?.document.close();
+
+      // Đợi nội dung được tải hoàn toàn và QR code được render trong iframe trước khi in
+      // Sử dụng setTimeout để đảm bảo trình duyệt có đủ thời gian xử lý
+      iframe.onload = () => {
+        // Thêm một độ trễ nhỏ để đảm bảo tất cả các tài nguyên (bao gồm QR code) đã được render
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (error) {
+            console.error("Lỗi khi in từ iframe:", error);
+            // Có thể hiển thị thông báo cho người dùng nếu in thất bại
+          }
+        }, 500); // 500ms độ trễ
+      };
     } else {
-      console.error("Không thể mở cửa sổ in. Có thể pop-up đã bị chặn.");
+      console.error("Không tìm thấy iframe để in.");
     }
   };
 
@@ -106,6 +122,8 @@ const QRCodeDisplayModal: React.FC<QRCodeDisplayModalModalProps> = ({ caseData, 
           </div>
         </div>
       </div>
+      {/* Iframe ẩn để in */}
+      <iframe ref={printIframeRef} style={{ display: 'none' }} title="Print Document"></iframe>
     </div>
   );
 };
