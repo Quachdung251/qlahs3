@@ -13,9 +13,15 @@ interface CaseFormProps {
   prosecutors: Prosecutor[];
   initialData?: Case | null;
   onCancelEdit?: () => void;
+  // Thêm prop để mở modal gia hạn
+  onSetExtensionModal?: (modalProps: {
+    case: Case;
+    type: 'investigation' | 'detention';
+    defendant?: Defendant;
+  }) => void;
 }
 
-const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData, onCancelEdit }) => {
+const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData, onCancelEdit, onSetExtensionModal }) => {
   // Hàm helper để thêm số ngày vào ngày hiện tại
   const addDaysToCurrentDate = (days: number): string => {
     const date = new Date();
@@ -264,12 +270,26 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
               />
             </div>
 
-            <DateInput
-              value={formData.investigationDeadline}
-              onChange={(value) => setFormData({ ...formData, investigationDeadline: value })}
-              label="Thời Hạn Điều Tra"
-              required
-            />
+            {/* Thời hạn điều tra với nút gia hạn */}
+            <div className="flex items-end gap-2">
+              <DateInput
+                value={formData.investigationDeadline}
+                onChange={(value) => setFormData({ ...formData, investigationDeadline: value })}
+                label="Thời Hạn Điều Tra"
+                required
+                className="flex-grow"
+              />
+              {isEditing && initialData && onSetExtensionModal && (
+                <button
+                  type="button"
+                  onClick={() => onSetExtensionModal({ case: initialData, type: 'investigation' })}
+                  className="p-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                  title="Gia hạn Điều tra"
+                >
+                  <Clock size={16} />
+                </button>
+              )}
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -429,13 +449,25 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
                       </div>
 
                       {defendant.preventiveMeasure === 'Tạm giam' && (
-                        <DateInput
-                          value={defendant.detentionDeadline || ''}
-                          onChange={(value) => updateDefendant(index, 'detentionDeadline', value)}
-                          label="Thời Hạn Tạm Giam"
-                          required
-                          className="col-span-1"
-                        />
+                        <div className="flex items-end gap-2 col-span-1">
+                          <DateInput
+                            value={defendant.detentionDeadline || ''}
+                            onChange={(value) => updateDefendant(index, 'detentionDeadline', value)}
+                            label="Thời Hạn Tạm Giam"
+                            required
+                            className="flex-grow"
+                          />
+                          {isEditing && initialData && onSetExtensionModal && (
+                            <button
+                              type="button"
+                              onClick={() => onSetExtensionModal({ case: initialData, type: 'detention', defendant })}
+                              className="p-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                              title={`Gia hạn tạm giam cho ${defendant.name}`}
+                            >
+                              <Clock size={16} />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
