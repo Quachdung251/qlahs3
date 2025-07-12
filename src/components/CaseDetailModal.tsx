@@ -1,6 +1,6 @@
 // ./components/CaseDetailModal.tsx
 import React, { useState } from 'react';
-import { X, Save, MessageSquare, Clock, Printer, Trash2, ArrowRight, CheckCircle, PauseCircle, Send, Star, Calendar } from 'lucide-react'; // Added Calendar for potential use, but Clock is used.
+import { X, Save, MessageSquare, Clock, Printer, Trash2, ArrowRight, CheckCircle, PauseCircle, Send, Star } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import NotesModal from './NotesModal';
 import ExtensionModal from './ExtensionModal';
@@ -159,7 +159,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-xl max-w-5xl w-full mx-4 relative overflow-y-auto max-h-[90vh]"> {/* Increased max-w to max-w-5xl */}
+      <div className="bg-white p-6 rounded-lg shadow-xl max-w-5xl w-full mx-4 relative overflow-y-auto max-h-[90vh]">
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
@@ -177,9 +177,8 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           </button>
         </h2>
 
-        {/* Main grid changed to lg:grid-cols-4 for wider layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-          {/* Left Column for Case Details - now col-span-2 */}
+          {/* Left Column for Case Details - col-span-2 */}
           <div className="lg:col-span-2">
             {/* Form chỉnh sửa chi tiết vụ án */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -269,6 +268,14 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               </div>
             </div>
 
+            {/* Hành động theo giai đoạn - Moved up */}
+            <div className="flex flex-wrap gap-3 mb-6 border-t pt-4">
+              <h3 className="text-lg font-semibold mb-2 w-full">Hành động theo giai đoạn:</h3>
+              {getStageActions(formData).map((actionButton, index) => (
+                <React.Fragment key={index}>{actionButton}</React.Fragment>
+              ))}
+            </div>
+
             {/* Khu vực các nút hành động chính */}
             <div className="flex flex-wrap gap-3 mb-6 border-t pt-4">
               <button
@@ -292,38 +299,29 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 <Printer size={16} /> In QR
               </button>
             </div>
-
-            {/* Hành động theo giai đoạn */}
-            <div className="flex flex-wrap gap-3 mb-6 border-t pt-4">
-              <h3 className="text-lg font-semibold mb-2 w-full">Hành động theo giai đoạn:</h3>
-              {getStageActions(formData).map((actionButton, index) => (
-                <React.Fragment key={index}>{actionButton}</React.Fragment>
-              ))}
-            </div>
           </div>
 
-          {/* Right Column for Defendants - now col-span-2 and adjusted presentation */}
+          {/* Right Column for Defendants - col-span-2 and adjusted presentation */}
           <div className="lg:col-span-2 border-l pl-6">
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-2">Thông tin Bị can:</h3>
               {formData.defendants && formData.defendants.length > 0 ? (
-                <div className="space-y-3"> {/* Increased space-y for better separation */}
+                <div className="space-y-4"> {/* Increased space-y for better separation and presentation */}
                   {formData.defendants.map(defendant => (
                     <div key={defendant.id} className="flex flex-col sm:flex-row sm:items-center bg-gray-50 p-3 rounded-md border border-gray-200">
                       <div className="flex-grow">
-                        <p className="text-sm font-semibold mb-1">{defendant.name}</p>
-                        <p className="text-xs text-gray-700">Điều 120.</p>
-                        {defendant.preventiveMeasure && (
-                          <p className="text-xs text-gray-700">BPNC: {defendant.preventiveMeasure}</p>
-                        )}
-                        {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                          <div className="text-xs text-gray-600 mt-1"> {/* New line for HTG */}
-                            HTG: {defendant.detentionDeadline}
+                        <p className="text-base font-semibold mb-1">{defendant.name}</p> {/* Increased font size */}
+                        <p className="text-sm text-gray-700">Điều 120.</p>
+                        {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline ? (
+                          <div className="text-sm text-gray-800 mt-1">
+                            BPNC: Tạm giam - {defendant.detentionDeadline}
                             <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                               ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                             </span>
                           </div>
-                        )}
+                        ) : defendant.preventiveMeasure ? (
+                            <p className="text-sm text-gray-700 mt-1">BPNC: {defendant.preventiveMeasure}</p>
+                        ) : null}
                       </div>
                       {defendant.preventiveMeasure === 'Tạm giam' && (
                         <button
