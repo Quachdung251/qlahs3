@@ -3,10 +3,13 @@ import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
-import NotesModal from './NotesModal';
-import ExtensionModal from './ExtensionModal';
-import QRCodeDisplayModal from './QRCodeDisplayModal';
+// import NotesModal from './NotesModal'; // Sẽ được chuyển vào CaseDetailModal
+// import ExtensionModal from './ExtensionModal'; // Sẽ được chuyển vào CaseDetailModal
+// import QRCodeDisplayModal from './QRCodeDisplayModal'; // Sẽ được chuyển vào CaseDetailModal
 import { generateQrCodeData } from '../utils/qrUtils';
+
+// Import CaseDetailModal mới
+import CaseDetailModal from './CaseDetailModal';
 
 interface CaseTableProps {
   cases: Case[];
@@ -19,7 +22,7 @@ interface CaseTableProps {
   onDeleteCase: (caseId: string) => void;
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onUpdateCase: (updatedCase: Case) => void;
-  onEditCase: (caseItem: Case) => void;
+  onEditCase: (caseItem: Case) => void; // Vẫn giữ prop này nhưng sẽ thay đổi cách sử dụng
   onToggleImportant: (caseId: string, isImportant: boolean) => void;
   showWarnings?: boolean;
 }
@@ -33,22 +36,26 @@ const CaseTable: React.FC<CaseTableProps> = ({
   onDeleteCase,
   onTransferStage,
   onUpdateCase,
-  onEditCase,
+  onEditCase, // Giờ sẽ dùng để mở modal
   onToggleImportant,
   showWarnings = false
 }) => {
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // Sẽ chuyển vào CaseDetailModal
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
-  const [notesCase, setNotesCase] = useState<Case | null>(null);
-  const [extensionModal, setExtensionModal] = useState<{
-    case: Case;
-    type: 'investigation' | 'detention';
-    defendant?: Defendant;
-  } | null>(null);
+  // const [notesCase, setNotesCase] = useState<Case | null>(null); // Sẽ chuyển vào CaseDetailModal
+  // const [extensionModal, setExtensionModal] = useState<{ // Sẽ chuyển vào CaseDetailModal
+  //   case: Case;
+  //   type: 'investigation' | 'detention';
+  //   defendant?: Defendant;
+  // } | null>(null);
 
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
+  // const [showQrModal, setShowQrModal] = useState(false); // Sẽ chuyển vào CaseDetailModal
+  // const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null); // Sẽ chuyển vào CaseDetailModal
+
+  // State mới để quản lý CaseDetailModal
+  const [showCaseDetailModal, setShowCaseDetailModal] = useState(false);
+  const [selectedCaseForDetail, setSelectedCaseForDetail] = useState<Case | null>(null);
 
   const [sortConfig, setSortConfig] = useState<{ key: SortKey | null; direction: SortDirection | null }>({
     key: null,
@@ -75,11 +82,24 @@ const CaseTable: React.FC<CaseTableProps> = ({
     setExpandedActions(newExpanded);
   };
 
-  const handlePrintExistingQR = (caseItem: Case) => {
-    const qrValue = generateQrCodeData(caseItem);
-    setQrCaseData({ qrValue, caseName: caseItem.name });
-    setShowQrModal(true);
+  // Hàm mở CaseDetailModal
+  const handleOpenCaseDetailModal = (caseItem: Case) => {
+    setSelectedCaseForDetail(caseItem);
+    setShowCaseDetailModal(true);
   };
+
+  // Hàm đóng CaseDetailModal
+  const handleCloseCaseDetailModal = () => {
+    setShowCaseDetailModal(false);
+    setSelectedCaseForDetail(null);
+  };
+
+  // Hàm này sẽ được truyền xuống CaseDetailModal để xử lý các hành động
+  // const handlePrintExistingQR = (caseItem: Case) => { // Sẽ chuyển vào CaseDetailModal
+  //   const qrValue = generateQrCodeData(caseItem);
+  //   setQrCaseData({ qrValue, caseName: caseItem.name });
+  //   setShowQrModal(true);
+  // };
 
   const getStageActions = (caseItem: Case) => {
     const actions = [];
@@ -89,7 +109,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
         actions.push(
           <button
             key="prosecution"
-            onClick={() => onTransferStage(caseItem.id, 'Truy tố')}
+            // onClick={() => onTransferStage(caseItem.id, 'Truy tố')} // Hành động này sẽ được xử lý trong CaseDetailModal
             className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
           >
             <ArrowRight size={12} />
@@ -101,7 +121,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
         actions.push(
           <button
             key="trial"
-            onClick={() => onTransferStage(caseItem.id, 'Xét xử')}
+            // onClick={() => onTransferStage(caseItem.id, 'Xét xử')} // Hành động này sẽ được xử lý trong CaseDetailModal
             className="flex items-center gap-1 px-2 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors whitespace-nowrap"
           >
             <ArrowRight size={12} />
@@ -113,7 +133,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
         actions.push(
           <button
             key="complete"
-            onClick={() => onTransferStage(caseItem.id, 'Hoàn thành')}
+            // onClick={() => onTransferStage(caseItem.id, 'Hoàn thành')} // Hành động này sẽ được xử lý trong CaseDetailModal
             className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors whitespace-nowrap"
           >
             <CheckCircle size={12} />
@@ -127,7 +147,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="transfer"
-          onClick={() => onTransferStage(caseItem.id, 'Chuyển đi')}
+          // onClick={() => onTransferStage(caseItem.id, 'Chuyển đi')} // Hành động này sẽ được xử lý trong CaseDetailModal
           className="flex items-center gap-1 px-2 py-1 bg-cyan-600 text-white rounded text-xs hover:bg-cyan-700 transition-colors whitespace-nowrap"
         >
           <Send size={12} />
@@ -138,7 +158,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="suspend"
-          onClick={() => onTransferStage(caseItem.id, 'Tạm đình chỉ')}
+          // onClick={() => onTransferStage(caseItem.id, 'Tạm đình chỉ')} // Hành động này sẽ được xử lý trong CaseDetailModal
           className="flex items-center gap-1 px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 transition-colors whitespace-nowrap"
         >
           <PauseCircle size={12} />
@@ -149,7 +169,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => setConfirmDelete(caseItem.id)}
+          // onClick={() => setConfirmDelete(caseItem.id)} // Hành động này sẽ được xử lý trong CaseDetailModal
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
@@ -173,7 +193,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
     return (
       <div className="flex items-center gap-2">
         <button
-          onClick={() => setNotesCase(caseItem)}
+          onClick={() => handleOpenCaseDetailModal(caseItem)} // Click vào đây để mở modal chi tiết, trong modal sẽ có nút ghi chú
           className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
           title="Xem/Sửa ghi chú"
         >
@@ -232,7 +252,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
           <div className="relative flex flex-col items-start gap-1">
             <button
               key="print-qr"
-              onClick={() => handlePrintExistingQR(caseItem)}
+              onClick={() => handleOpenCaseDetailModal(caseItem)} // Click vào đây để mở modal chi tiết, trong modal sẽ có nút in QR
               className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
               title="In nhãn QR Code"
             >
@@ -241,7 +261,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
             </button>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => onEditCase(caseItem)}
+                onClick={() => handleOpenCaseDetailModal(caseItem)} // Thay đổi để mở CaseDetailModal
                 className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors"
               >
                 <Edit2 size={12} />
@@ -250,7 +270,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
               {caseItem.stage === 'Điều tra' && (
                 <button
-                  onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
+                  onClick={() => handleOpenCaseDetailModal(caseItem)} // Thay đổi để mở CaseDetailModal, trong đó có gia hạn ĐT
                   className="p-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors"
                   title="Gia hạn Điều tra"
                 >
@@ -258,6 +278,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 </button>
               )}
 
+              {/* Chỉ hiển thị nút hành động đầu tiên nếu có */}
               {stageActions.length > 0 && stageActions[0]}
 
               {stageActions.length > 1 && (
@@ -273,6 +294,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
             {isExpanded && stageActions.length > 1 && (
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-max">
                 <div className="p-2 space-y-1">
+                  {/* Các hành động này sẽ được xử lý trong CaseDetailModal */}
                   {stageActions.slice(1).map((action, index) => (
                     <div key={index} className="block">
                       {action}
@@ -523,7 +545,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                                       </span>
                                     </div>
                                     <button
-                                      onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
+                                      onClick={() => handleOpenCaseDetailModal(caseItem)} // Thay đổi để mở CaseDetailModal, trong đó có gia hạn tạm giam
                                       className="flex items-center gap-0 px-0 py-0 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
                                     >
                                       <Clock size={10} />
@@ -545,61 +567,16 @@ const CaseTable: React.FC<CaseTableProps> = ({
         </table>
       </div>
 
-      {/* Notes Modal */}
-      {notesCase && (
-        <NotesModal
-          case={notesCase}
-          onSave={onUpdateCase}
-          onClose={() => setNotesCase(null)}
-        />
-      )}
-
-      {/* Extension Modal */}
-      {extensionModal && (
-        <ExtensionModal
-          case={extensionModal.case}
-          type={extensionModal.type}
-          defendant={extensionModal.defendant}
-          onSave={onUpdateCase}
-          onClose={() => setExtensionModal(null)}
-        />
-      )}
-
-      {/* Confirmation Modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận xóa</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Bạn có chắc chắn muốn xóa vụ án này không? Hành động này không thể hoàn tác.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={() => {
-                  onDeleteCase(confirmDelete);
-                  setConfirmDelete(null);
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Xóa
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal hiển thị QR Code cho vụ án hiện có */}
-      {showQrModal && qrCaseData && (
-        <QRCodeDisplayModal
-          qrCodeValue={qrCaseData.qrValue}
-          caseName={qrCaseData.caseName}
-          onClose={() => setShowQrModal(false)}
+      {/* CaseDetailModal */}
+      {showCaseDetailModal && selectedCaseForDetail && (
+        <CaseDetailModal
+          caseItem={selectedCaseForDetail}
+          onClose={handleCloseCaseDetailModal}
+          onUpdateCase={onUpdateCase}
+          onDeleteCase={onDeleteCase}
+          onTransferStage={onTransferStage}
+          onToggleImportant={onToggleImportant}
+          // Các props khác cần thiết nếu bạn muốn truyền xuống các sub-modal trong CaseDetailModal
         />
       )}
     </div>
