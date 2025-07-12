@@ -215,10 +215,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         const shortestDays = Math.min(...detainedDefendants.map(d => getDaysRemaining(d.detentionDeadline!)));
         return `${shortestDays} ngày`;
       case 'investigationRemaining':
-        // Đảm bảo investigationDeadline là chuỗi không rỗng
-        if (typeof caseItem.investigationDeadline !== 'string' || caseItem.investigationDeadline === '') {
-            return 'Không có';
-        }
         const remaining = getDaysRemaining(caseItem.investigationDeadline);
         return `${remaining} ngày`;
       case 'shortestDetentionRemaining':
@@ -305,8 +301,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       return 'bg-blue-50';
     }
     if (showWarnings) {
-      // Đảm bảo investigationDeadline là chuỗi không rỗng trước khi kiểm tra
-      if (caseItem.stage === 'Điều tra' && typeof caseItem.investigationDeadline === 'string' && caseItem.investigationDeadline !== '' && isExpiringSoon(caseItem.investigationDeadline)) {
+      if (caseItem.stage === 'Điều tra' && isExpiringSoon(caseItem.investigationDeadline)) {
         return 'bg-yellow-50';
       }
 
@@ -342,9 +337,8 @@ const CaseTable: React.FC<CaseTableProps> = ({
             bValue = new Date(b.createdAt).getTime();
             break;
           case 'investigationDeadline': // Hạn điều tra
-            // Xử lý khi investigationDeadline có thể là undefined hoặc chuỗi rỗng
-            aValue = (typeof a.investigationDeadline === 'string' && a.investigationDeadline !== '') ? getDaysRemaining(a.investigationDeadline) : Infinity;
-            bValue = (typeof b.investigationDeadline === 'string' && b.investigationDeadline !== '') ? getDaysRemaining(b.investigationDeadline) : Infinity;
+            aValue = getDaysRemaining(a.investigationDeadline);
+            bValue = getDaysRemaining(b.investigationDeadline);
             break;
           case 'shortestDetentionRemaining': // Hạn tạm giam (gần nhất)
             // Đảm bảo chỉ lấy các bị can có detentionDeadline là chuỗi không rỗng
@@ -510,7 +504,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       {/* Cần điều chỉnh colSpan để phù hợp với số lượng cột hiện tại (bao gồm 3 cột sticky) */}
                       <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-2">
-                          <h4 className="font-medium text-gray-900}>Chi tiết Bị Can:</h4>
+                          <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                           {caseItem.defendants.map((defendant, index) => (
                             <div key={defendant.id || index} className="bg-white p-3 rounded border">
                               <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
@@ -607,7 +601,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       {/* Modal hiển thị QR Code cho vụ án hiện có */}
       {showQrModal && qrCaseData && (
         <QRCodeDisplayModal
-          qrCodeValue={qrCaseData.qrCodeValue}
+          qrCodeValue={qrCaseData.qrValue}
           caseName={qrCaseData.caseName}
           onClose={() => setShowQrModal(false)}
         />
