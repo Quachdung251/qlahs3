@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode } from 'lucide-react';
+import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode, Plus, MessageSquare } from 'lucide-react';
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
 import CaseTable from './components/CaseTable';
@@ -18,8 +18,8 @@ import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
 import { Prosecutor, useProsecutors } from './hooks/useProsecutors'; // Ensure Prosecutor type is imported
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils';
-import { Case, Report, CaseFormData, ReportFormData, UserRole } from './types'; // Ensure UserRole is imported if used
-import { getCurrentDate, getDaysRemaining } from './utils/dateUtils';
+import { Case, Report, CaseFormData, ReportFormData, UserRole, Defendant } from './types'; // Ensure UserRole is imported if used
+import { getCurrentDate, getDaysRemaining, isExpiringSoon } from './utils/dateUtils';
 import QRCodeScannerModal from './components/QRCodeScannerModal';
 import NotesModal from './components/NotesModal'; // Ensure NotesModal is imported
 import ExtensionModal from './components/ExtensionModal'; // Ensure ExtensionModal is imported
@@ -385,7 +385,7 @@ function App() {
                     prosecutors={prosecutors}
                     initialData={editingCase}
                     onCancelEdit={handleCancelCaseEdit}
-                    onSetExtensionModal={setExtensionModal} {/* Pass the setter here */}
+                    onSetExtensionModal={setExtensionModal}
                   />
                 </div>
               </div>
@@ -491,7 +491,7 @@ function App() {
             <p className="text-sm text-gray-600 mb-6">
               Bạn có chắc chắn muốn xóa vụ án này không? Hành động này không thể hoàn tác.
             </p>
-            <div className="flex justify-end gap-3}>
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
