@@ -167,25 +167,12 @@ const CaseTable: React.FC<CaseTableProps> = ({
       </button>
     );
 
-    // THÊM NÚT XUẤT BÁO CÁO VỤ ÁN
-    actions.push(
-      <button
-        key="view-report"
-        onClick={() => onViewReport(caseItem)}
-        className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 transition-colors whitespace-nowrap"
-        title="Xem và xuất báo cáo vụ án"
-      >
-        <FileText size={12} />
-        Báo cáo
-      </button>
-    );
-
     return actions;
   };
 
   const renderCaseNameCell = (caseItem: Case) => {
     return (
-      <div className="max-w-xs">
+      <div className="max-w-[150px]"> {/* Thu hẹp chiều rộng tối đa */}
         <div className="font-medium text-gray-900 truncate" title={caseItem.name}>
           {caseItem.name}
         </div>
@@ -258,13 +245,24 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return (
           <div className="relative">
             <div className="flex items-center gap-1">
-              {/* Always show Edit button, now calling onEditCase prop */}
+              {/* Nút "Sửa" luôn hiển thị */}
               <button
                 onClick={() => onEditCase(caseItem)}
                 className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
               >
                 <Edit2 size={12} />
                 Sửa
+              </button>
+
+              {/* Nút "Báo cáo" được đưa ra ngoài để dễ nhìn hơn */}
+              <button
+                key="view-report"
+                onClick={() => onViewReport(caseItem)}
+                className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                title="Xem và xuất báo cáo vụ án"
+              >
+                <FileText size={12} />
+                Báo cáo
               </button>
 
               {/* Extension button for investigation stage */}
