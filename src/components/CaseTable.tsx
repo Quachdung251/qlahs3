@@ -175,7 +175,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   const renderCaseNameCell = (caseItem: Case) => {
     return (
-      // Sử dụng w-48 (hoặc một giá trị cố định) để đảm bảo chiều rộng và text-ellipsis
+      // Sử dụng w-48 để cố định chiều rộng, overflow-hidden và text-ellipsis để thu gọn
       <div className="w-48 overflow-hidden text-ellipsis whitespace-nowrap" title={`${caseItem.name} - ${caseItem.charges}`}>
         <div className="font-medium text-gray-900">{caseItem.name}</div>
         <div className="text-sm text-gray-500">{caseItem.charges}</div>
@@ -366,17 +366,33 @@ const CaseTable: React.FC<CaseTableProps> = ({
     return sortableCases;
   }, [cases, sortConfig]);
 
+  // Chiều rộng ước tính của các cột sticky (để tính toán left offset)
+  // px-6 py-3: padding (1.5rem = 24px mỗi bên) => tổng 48px padding ngang
+  // Mở rộng: icon 20px + padding => khoảng 20px + 2*24px = 68px. Để an toàn, dùng 72px (w-18)
+  // Quan trọng: icon 20px + padding => khoảng 20px + 2*24px = 68px. Để an toàn, dùng 72px (w-18)
+  // Tên Vụ án: w-48 (192px) + padding => 192px + 2*24px = 240px.
+
+  const EXPAND_COL_WIDTH = 72; // width of 'Mở rộng' column (approx px value of w-18)
+  const IMPORTANT_COL_WIDTH = 72; // width of 'Quan trọng' column (approx px value of w-18)
+  const NAME_COL_WIDTH = 240; // width of 'Tên Vụ án' column (approx px value of w-48 with padding)
+
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      {/* Bao bọc toàn bộ bảng để thanh cuộn ngang áp dụng cho cả header và body */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200"> {/* Đảm bảo bảng có chiều rộng tối thiểu */}
+        <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20">
+              <th
+                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-30 w-18" // w-18 ~ 72px
+                style={{ minWidth: EXPAND_COL_WIDTH }} // Đảm bảo chiều rộng tối thiểu
+              >
                 Mở rộng
               </th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer sticky left-[72px] bg-gray-50 z-20" // Điều chỉnh left offset
+                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer sticky left-[72px] bg-gray-50 z-30 w-18" // left = EXPAND_COL_WIDTH
+                style={{ minWidth: IMPORTANT_COL_WIDTH }} // Đảm bảo chiều rộng tối thiểu
                 onClick={() => handleSort('isImportant')}
               >
                 <div className="flex items-center gap-1">
@@ -387,8 +403,36 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 </div>
               </th>
               {columns.map((column) => {
-                if (column.key === 'isImportant') return null; // Không render lại cột này
-                const isSortable = column.sortable !== false && ['name', 'createdAt', 'investigationDeadline', 'shortestDetentionRemaining'].includes(column.key); // Ví dụ các cột có thể sắp xếp
+                if (column.key === 'isImportant') return null; // Không render lại cột này ở đây
+
+                const isSortable = column.sortable !== false &&
+                  (column.key === 'createdAt' || // Mới thêm vào
+                   column.key === 'investigationDeadline' || // Hạn điều tra
+                   column.key === 'shortestDetentionRemaining' || // Hạn tạm giam (tính toán)
+                   column.key === 'name' || // Tên vụ án
+                   column.key === 'stage' // Giai đoạn
+                   );
+
+                // Đặc biệt xử lý cột 'name' để nó cũng sticky
+                if (column.key === 'name') {
+                  return (
+                    <th
+                      key={column.key}
+                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isSortable ? 'cursor-pointer' : ''} sticky left-[144px] bg-gray-50 z-20`} // left = EXPAND_COL_WIDTH + IMPORTANT_COL_WIDTH
+                      style={{ minWidth: NAME_COL_WIDTH }} // Đảm bảo chiều rộng tối thiểu
+                      onClick={() => isSortable && handleSort(column.key as SortKey)}
+                    >
+                      <div className="flex items-center gap-1">
+                        {column.label}
+                        {sortConfig.key === column.key && (
+                          sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                        )}
+                      </div>
+                    </th>
+                  );
+                }
+
+                // Các cột còn lại
                 return (
                   <th
                     key={column.key}
@@ -417,7 +461,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
               sortedCases.map((caseItem) => (
                 <React.Fragment key={caseItem.id}>
                   <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
-                    <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white z-10">
+                    <td
+                      className="px-2 py-4 whitespace-nowrap sticky left-0 bg-white z-20" // z-index thấp hơn thead, cao hơn body bình thường
+                      style={{ minWidth: EXPAND_COL_WIDTH }}
+                    >
                       <button
                         onClick={() => toggleExpanded(caseItem.id)}
                         className="text-gray-500 hover:text-gray-700"
@@ -429,11 +476,25 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         )}
                       </button>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 sticky left-[72px] bg-white z-10"> {/* Điều chỉnh left offset */}
+                    <td
+                      className="px-2 py-4 text-sm text-gray-900 sticky left-[72px] bg-white z-20" // left = EXPAND_COL_WIDTH
+                      style={{ minWidth: IMPORTANT_COL_WIDTH }}
+                    >
                       {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
                     </td>
                     {columns.map((column) => {
-                       if (column.key === 'isImportant') return null;
+                       if (column.key === 'isImportant') return null; // Không render lại cột này
+                       if (column.key === 'name') { // Đặc biệt xử lý cột 'name'
+                         return (
+                           <td
+                             key={column.key}
+                             className="px-6 py-4 text-sm text-gray-900 sticky left-[144px] bg-white z-10" // left = EXPAND_COL_WIDTH + IMPORTANT_COL_WIDTH
+                             style={{ minWidth: NAME_COL_WIDTH }}
+                           >
+                             {renderCellContent(caseItem, column)}
+                           </td>
+                         );
+                       }
                       return (
                         <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
                           {renderCellContent(caseItem, column)}
@@ -443,7 +504,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                   </tr>
                   {expandedCases.has(caseItem.id) && (
                     <tr>
-                      {/* Cần điều chỉnh colSpan để phù hợp với số lượng cột hiện tại (bao gồm 2 cột sticky) */}
+                      {/* Cần điều chỉnh colSpan để phù hợp với số lượng cột hiện tại (bao gồm 3 cột sticky) */}
                       <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-2">
                           <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
