@@ -53,6 +53,7 @@ const App: React.FC = () => {
 
   // State mới để quản lý modal báo cáo vụ án
   const [caseToReport, setCaseToReport] = useState<Case | null>(null);
+  const [shouldAutoPrintCaseReport, setShouldAutoPrintCaseReport] = useState<boolean>(false); // State mới để kích hoạt in tự động
 
   // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
   const handleEditCase = useCallback((caseToEdit: Case) => {
@@ -163,16 +164,42 @@ const App: React.FC = () => {
   };
 
   // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
-  const handleCaseFormSubmit = async (caseData: CaseFormData, isEditing: boolean) => {
+  const handleCaseFormSubmit = async (caseData: CaseFormData, isEditing: boolean, printAfterSave: boolean): Promise<Case | void> => {
     let resultCase: Case | void;
-    if (isEditing && editingCase) {
-      resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant }); // GIỮ isImportant
-      setEditingCase(null); // Xóa trạng thái chỉnh sửa
-      setActiveTab('all'); // Chuyển về tab danh sách
-    } else {
-      resultCase = await addCase(caseData);
+    console.log("handleCaseFormSubmit called. isEditing:", isEditing, "printAfterSave:", printAfterSave);
+    try {
+      if (isEditing && editingCase) {
+        console.log("Updating existing case...");
+        resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant });
+        if (!resultCase) { // Explicitly check if updateCase failed to return a case
+          throw new Error("Failed to update case.");
+        }
+        setEditingCase(null);
+        setActiveTab('all');
+      } else {
+        console.log("Adding new case...");
+        resultCase = await addCase(caseData);
+        if (!resultCase) { // Explicitly check if addCase failed to return a case
+          throw new Error("Failed to add case.");
+        }
+        console.log("New case added:", resultCase);
+        if (printAfterSave) {
+          console.log("Setting case for auto-print:", resultCase.id);
+          setCaseToReport(resultCase);
+          setShouldAutoPrintCaseReport(true);
+        } else {
+          console.log("Print after save not requested.");
+          setCaseToReport(null);
+          setShouldAutoPrintCaseReport(false);
+        }
+        setActiveTab('all');
+      }
+      return resultCase; // Return the successfully added/updated case
+    } catch (error) {
+      console.error("Error in handleCaseFormSubmit:", error);
+      // Re-throw the error so CaseForm's handleSubmit can catch it and display a message
+      throw error;
     }
-    return resultCase; // Trả về vụ án đã được thêm/cập nhật
   };
 
   // Hàm xử lý khi form chỉnh sửa tin báo hoàn tất (lưu hoặc hủy)
@@ -609,7 +636,7 @@ const App: React.FC = () => {
         case 'add':
           return (
             <CaseForm
-              onSubmit={(data, isEditing) => handleCaseFormSubmit(data, isEditing)}
+              onSubmit={(data, isEditing, printAfterSave) => handleCaseFormSubmit(data, isEditing, printAfterSave)} // Cập nhật onSubmit
               prosecutors={prosecutors}
               initialData={editingCase}
               onCancelEdit={() => {
@@ -886,7 +913,11 @@ const App: React.FC = () => {
       {caseToReport && (
         <CaseReportModal
           caseItem={caseToReport}
-          onClose={() => setCaseToReport(null)}
+          onClose={() => {
+            setCaseToReport(null);
+            setShouldAutoPrintCaseReport(false); // Reset trạng thái tự động in khi đóng modal
+          }}
+          autoPrint={shouldAutoPrintCaseReport} // Truyền prop autoPrint
         />
       )}
     </div>
