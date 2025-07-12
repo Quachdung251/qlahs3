@@ -8,12 +8,62 @@ import QRCodeDisplayModal from './QRCodeDisplayModal';
 import { generateQrCodeData } from '../utils/qrUtils';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 
+// New StageDateModal component for date input
+interface StageDateModalProps {
+  onClose: () => void;
+  onSave: (date: string, targetStage: Case['stage']) => void;
+  targetStage: Case['stage'];
+}
+
+const StageDateModal: React.FC<StageDateModalProps> = ({ onClose, onSave, targetStage }) => {
+  const [date, setDate] = useState('');
+
+  const handleSubmit = () => {
+    if (date) {
+      onSave(date, targetStage);
+      onClose();
+    } else {
+      alert('Vui lòng chọn ngày hành động.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Nhập Ngày Hành Động</h3>
+        <p className="text-sm text-gray-600 mb-4">Chọn ngày cho hành động chuyển sang giai đoạn "{targetStage}".</p>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+        />
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+          >
+            Hủy
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Xác nhận
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 interface CaseDetailModalProps {
   caseItem: Case;
   onClose: () => void;
   onUpdateCase: (updatedCase: Case) => void;
-  onDeleteCase: (caseId: string) => void;
-  onTransferStage: (caseId: string, newStage: Case['stage']) => void;
+  onDeleteCase: (caseId: string) => void; // Keep for now, but not used by stage actions
+  onTransferStage: (caseId: string, newStage: Case['stage']) => void; // Will be less used for direct calls
   onToggleImportant: (caseId: string, isImportant: boolean) => void;
 }
 
@@ -21,8 +71,8 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   caseItem,
   onClose,
   onUpdateCase,
-  onDeleteCase,
-  onTransferStage,
+  // onDeleteCase, // Not used by stage actions anymore
+  // onTransferStage, // Not directly called by stage action buttons anymore
   onToggleImportant,
 }) => {
   const [formData, setFormData] = useState<Case>(caseItem);
@@ -34,7 +84,9 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   } | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // New state for the stage date input modal
+  const [stageDateModalInfo, setStageDateModalInfo] = useState<{ targetStage: Case['stage'] } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -52,6 +104,18 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
     setShowQrModal(true);
   };
 
+  // Function to handle saving date and updating stage in formData
+  const handleStageDateSave = (date: string, targetStage: Case['stage']) => {
+    setFormData(prev => ({
+      ...prev,
+      stage: targetStage,
+      // You might want to add a field like `lastStageChangeDate` to your Case type
+      // to store the date associated with the stage change.
+      // For example:
+      // lastStageChangeDate: date,
+    }));
+  };
+
   const getStageActions = (caseItem: Case) => {
     const actions = [];
 
@@ -60,12 +124,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         actions.push(
           <button
             key="prosecution"
-            onClick={() => {
-              if (window.confirm('Bạn có chắc chắn muốn chuyển sang giai đoạn Truy tố?')) {
-                onTransferStage(caseItem.id, 'Truy tố');
-                onClose();
-              }
-            }}
+            onClick={() => setStageDateModalInfo({ targetStage: 'Truy tố' })}
             className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
           >
             <ArrowRight size={12} />
@@ -77,12 +136,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         actions.push(
           <button
             key="trial"
-            onClick={() => {
-              if (window.confirm('Bạn có chắc chắn muốn chuyển sang giai đoạn Xét xử?')) {
-                onTransferStage(caseItem.id, 'Xét xử');
-                onClose();
-              }
-            }}
+            onClick={() => setStageDateModalInfo({ targetStage: 'Xét xử' })}
             className="flex items-center gap-1 px-2 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors whitespace-nowrap"
           >
             <ArrowRight size={12} />
@@ -94,12 +148,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         actions.push(
           <button
             key="complete"
-            onClick={() => {
-              if (window.confirm('Bạn có chắc chắn muốn chuyển sang giai đoạn Hoàn thành?')) {
-                onTransferStage(caseItem.id, 'Hoàn thành');
-                onClose();
-              }
-            }}
+            onClick={() => setStageDateModalInfo({ targetStage: 'Hoàn thành' })}
             className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors whitespace-nowrap"
           >
             <CheckCircle size={12} />
@@ -113,12 +162,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       actions.push(
         <button
           key="transfer"
-          onClick={() => {
-            if (window.confirm('Bạn có chắc chắn muốn chuyển vụ án này đi?')) {
-              onTransferStage(caseItem.id, 'Chuyển đi');
-              onClose();
-            }
-          }}
+          onClick={() => setStageDateModalInfo({ targetStage: 'Chuyển đi' })}
           className="flex items-center gap-1 px-2 py-1 bg-cyan-600 text-white rounded text-xs hover:bg-cyan-700 transition-colors whitespace-nowrap"
         >
           <Send size={12} />
@@ -129,12 +173,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       actions.push(
         <button
           key="suspend"
-          onClick={() => {
-            if (window.confirm('Bạn có chắc chắn muốn tạm đình chỉ vụ án này?')) {
-              onTransferStage(caseItem.id, 'Tạm đình chỉ');
-              onClose();
-            }
-          }}
+          onClick={() => setStageDateModalInfo({ targetStage: 'Tạm đình chỉ' })}
           className="flex items-center gap-1 px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 transition-colors whitespace-nowrap"
         >
           <PauseCircle size={12} />
@@ -145,7 +184,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => setConfirmDelete(caseItem.id)}
+          onClick={() => setStageDateModalInfo({ targetStage: 'Đình chỉ' })} // Now also uses the date modal
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
@@ -306,11 +345,11 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-2">Thông tin Bị can:</h3>
               {formData.defendants && formData.defendants.length > 0 ? (
-                <div className="space-y-4"> {/* Increased space-y for better separation and presentation */}
+                <div className="space-y-4">
                   {formData.defendants.map(defendant => (
                     <div key={defendant.id} className="flex flex-col sm:flex-row sm:items-center bg-gray-50 p-3 rounded-md border border-gray-200">
                       <div className="flex-grow">
-                        <p className="text-base font-semibold mb-1">{defendant.name}</p> {/* Increased font size */}
+                        <p className="text-base font-semibold mb-1">{defendant.name}</p>
                         <p className="text-sm text-gray-700">Điều 120.</p>
                         {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline ? (
                           <div className="text-sm text-gray-800 mt-1">
@@ -336,7 +375,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">Không có bị can nào.</p>
+                <p className="text-base text-gray-500">Không có bị can nào.</p>
               )}
             </div>
           </div>
@@ -372,34 +411,13 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         />
       )}
 
-      {/* Confirmation Modal for Delete (Sub-modal) */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận xóa</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Bạn có chắc chắn muốn xóa vụ án này không? Hành động này không thể hoàn tác.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={() => {
-                  onDeleteCase(confirmDelete);
-                  setConfirmDelete(null);
-                  onClose();
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Xóa
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Stage Date Input Modal (New Sub-modal) */}
+      {stageDateModalInfo && (
+        <StageDateModal
+          onClose={() => setStageDateModalInfo(null)}
+          onSave={handleStageDateSave}
+          targetStage={stageDateModalInfo.targetStage}
+        />
       )}
     </div>
   );
