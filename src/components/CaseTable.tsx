@@ -175,7 +175,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   const renderCaseNameCell = (caseItem: Case) => {
     return (
-      <div className="w-48 overflow-hidden text-ellipsis whitespace-nowrap" title={`${caseItem.name} - ${caseItem.charges}`}>
+      <div className="w-32 overflow-hidden text-ellipsis whitespace-nowrap" title={`${caseItem.name} - ${caseItem.charges}`}>
         <div className="font-medium text-gray-900">{caseItem.name}</div>
         <div className="text-sm text-gray-500">{caseItem.charges}</div>
       </div>
@@ -343,7 +343,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
           case 'shortestDetentionRemaining': // Hạn tạm giam (gần nhất)
             // Đảm bảo chỉ lấy các bị can có detentionDeadline là chuỗi không rỗng
             const aDetainedDefs = a.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && typeof d.detentionDeadline === 'string' && d.detentionDeadline !== '');
-            const bDetainedDefs = b.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && typeof d.detentionDeadline === 'string' && d.detentionDeadline !== '');
+            const bDetainedDefs = b.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && typeof b.detentionDeadline === 'string' && b.detentionDeadline !== '');
             aValue = aDetainedDefs.length > 0 ? Math.min(...aDetainedDefs.map(d => getDaysRemaining(d.detentionDeadline!))) : Infinity;
             bValue = bDetainedDefs.length > 0 ? Math.min(...bDetainedDefs.map(d => getDaysRemaining(b.detentionDeadline!))) : Infinity;
             break;
@@ -368,9 +368,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
   }, [cases, sortConfig]);
 
   // Chiều rộng ước tính của các cột sticky (để tính toán left offset)
-  const EXPAND_COL_WIDTH = 72; // w-18 ~ 72px
-  const IMPORTANT_COL_WIDTH = 72; // w-18 ~ 72px
-  const NAME_COL_WIDTH = 240; // w-48 ~ 192px + padding (2*24px) = 240px
+  const EXPAND_COL_WIDTH = 56; // w-14 ~ 56px
+  const IMPORTANT_COL_WIDTH = 56; // w-14 ~ 56px
+  const NAME_COL_WIDTH = 160; // w-32 (128px) + 2*16px (px-4) = 160px
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -406,13 +406,13 @@ const CaseTable: React.FC<CaseTableProps> = ({
           <thead className="bg-gray-50">
             <tr>
               <th
-                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-30 w-18"
+                className="px-1 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-30 w-14"
                 style={{ minWidth: EXPAND_COL_WIDTH }}
               >
                 Mở rộng
               </th>
               <th
-                className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[72px] bg-gray-50 z-30 w-18"
+                className="px-1 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[56px] bg-gray-50 z-30 w-14"
                 style={{ minWidth: IMPORTANT_COL_WIDTH }}
               >
                 Quan trọng
@@ -427,7 +427,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                   return (
                     <th
                       key={column.key}
-                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[144px] bg-gray-50 z-20`}
+                      className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[112px] bg-gray-50 z-20`}
                       style={{ minWidth: NAME_COL_WIDTH }}
                     >
                       {column.label}
@@ -439,7 +439,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 return (
                   <th
                     key={column.key}
-                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
+                    className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
                   >
                     {column.label}
                   </th>
@@ -459,7 +459,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 <React.Fragment key={caseItem.id}>
                   <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
                     <td
-                      className="px-2 py-4 whitespace-nowrap sticky left-0 bg-white z-20"
+                      className="px-1 py-3 whitespace-nowrap sticky left-0 bg-white z-20"
                       style={{ minWidth: EXPAND_COL_WIDTH }}
                     >
                       <button
@@ -474,7 +474,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                       </button>
                     </td>
                     <td
-                      className="px-2 py-4 text-sm text-gray-900 sticky left-[72px] bg-white z-20"
+                      className="px-1 py-3 text-sm text-gray-900 sticky left-[56px] bg-white z-20"
                       style={{ minWidth: IMPORTANT_COL_WIDTH }}
                     >
                       {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
@@ -485,7 +485,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                          return (
                            <td
                              key={column.key}
-                             className="px-6 py-4 text-sm text-gray-900 sticky left-[144px] bg-white z-10"
+                             className="px-4 py-3 text-sm text-gray-900 sticky left-[112px] bg-white z-10"
                              style={{ minWidth: NAME_COL_WIDTH }}
                            >
                              {renderCellContent(caseItem, column)}
@@ -493,7 +493,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                          );
                        }
                       return (
-                        <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
+                        <td key={column.key} className="px-4 py-3 text-sm text-gray-900">
                           {renderCellContent(caseItem, column)}
                         </td>
                       );
@@ -508,13 +508,13 @@ const CaseTable: React.FC<CaseTableProps> = ({
                           {caseItem.defendants.map((defendant, index) => (
                             <div key={defendant.id || index} className="bg-white p-3 rounded border">
                               <div className="flex flex-wrap text-sm items-start gap-x-4 gap-y-2">
-                                <div className="w-40 flex-shrink-0">
+                                <div className="w-32 flex-shrink-0">
                                   <span className="font-medium">Tên:</span> <span className="whitespace-normal">{defendant.name}</span>
                                 </div>
-                                <div className="w-80 flex-shrink-0">
+                                <div className="w-64 flex-shrink-0">
                                   <span className="font-medium">Tội danh:</span> <span className="whitespace-normal">{defendant.charges}</span>
                                 </div>
-                                <div className="w-40 flex-shrink-0">
+                                <div className="w-32 flex-shrink-0">
                                   <span className="font-medium">Biện pháp:</span> <span className="whitespace-normal">{defendant.preventiveMeasure}</span>
                                 </div>
                                 {/* Đảm bảo chỉ hiển thị và tính toán nếu detentionDeadline là chuỗi không rỗng */}
@@ -528,7 +528,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                                     </div>
                                     <button
                                       onClick={() => setExtensionModal({ case: caseItem, type: 'detention', defendant })}
-                                      className="flex items-center gap-0.5 px-0.5 py-0.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
+                                      className="flex items-center gap-0 px-0 py-0 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors ml-2"
                                     >
                                       <Clock size={10} />
                                       Gia hạn
