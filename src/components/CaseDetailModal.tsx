@@ -8,19 +8,35 @@ import QRCodeDisplayModal from './QRCodeDisplayModal';
 import { generateQrCodeData } from '../utils/qrUtils';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 
-// Helper function to format date from YYYY-MM-DD to DD/MM/YYYY for display
+// Helper function to format date for display (more robust)
 const formatDateToDDMMYYYY = (dateString: string): string => {
   if (!dateString) return '';
-  try {
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-  } catch (error) {
-    console.error("Error formatting date:", dateString, error);
-    return dateString; // Return original if parsing fails
+  // Attempt to parse YYYY-MM-DD (standard from input type="date")
+  const partsHyphen = dateString.split('-');
+  if (partsHyphen.length === 3) {
+    const [year, month, day] = partsHyphen;
+    // Basic validation to ensure they look like parts of a date
+    if (year.length === 4 && month.length === 2 && day.length === 2) {
+      return `${day}/${month}/${year}`;
+    }
   }
+
+  // If not YYYY-MM-DD, try to parse DD/MM/YYYY (e.g., if date was already stored/entered in this format)
+  const partsSlash = dateString.split('/');
+  if (partsSlash.length === 3) {
+    const [day, month, year] = partsSlash;
+    // Basic validation
+    if (day.length <= 2 && month.length <= 2 && year.length === 4) {
+      return dateString; // It's already in DD/MM/YYYY format, return as is
+    }
+  }
+
+  // Fallback for any other unexpected format, log a warning
+  console.warn(`Unexpected date format encountered for display: "${dateString}". Please ensure dates are stored internally in YYYY-MM-DD format for full functionality.`);
+  return dateString; // Return original string as a last resort
 };
 
-// New StageDateModal component for date input
+// StageDateModal component for date input
 interface StageDateModalProps {
   onClose: () => void;
   onSave: (date: string, targetStage: Case['stage']) => void;
@@ -43,7 +59,13 @@ const StageDateModal: React.FC<StageDateModalProps> = ({ onClose, onSave, target
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Nhập Ngày Hành Động</h3>
-        <p className="text-sm text-gray-600 mb-4">Chọn ngày cho hành động chuyển sang giai đoạn "{targetStage}".</p>
+        <p className="text-sm text-gray-600 mb-4">
+          Chọn ngày cho hành động chuyển sang giai đoạn "{targetStage}".
+          <br />
+          <span className="text-xs text-gray-500">
+            (Định dạng hiển thị lịch phụ thuộc vào cài đặt ngôn ngữ & khu vực của trình duyệt/hệ điều hành của bạn)
+          </span>
+        </p>
         <input
           type="date"
           value={date}
