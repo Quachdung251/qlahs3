@@ -1,8 +1,9 @@
 // components/CaseReportModal.tsx
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { X, Printer } from 'lucide-react';
 import { Case, Defendant } from '../types';
-import { generateQrCodeData } from '../utils/qrUtils'; // Giữ nguyên import này
+import { generateQrCodeData } from '../utils/qrUtils';
+import QRCode from 'qrcode'; // Import thư viện qrcode
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
@@ -12,29 +13,44 @@ interface CaseReportModalProps {
 }
 
 const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) => {
-  const qrCanvasRef = useRef<HTMLCanvasElement>(null); // Ref cho canvas trong modal (nếu muốn hiển thị QR trong modal)
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null); // Ref cho canvas trong modal (để xem trước)
   const reportContentRef = useRef<HTMLDivElement>(null); // Ref cho nội dung báo cáo để in
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null); // State để lưu trữ Data URL của QR Code
 
-  // Effect để vẽ QR Code trong modal (nếu cần)
-  // Lưu ý: Nếu bạn chỉ muốn QR hiển thị trong bản in, có thể bỏ qua useEffect này.
-  // Tuy nhiên, để tiện xem trước, tôi vẫn giữ nó ở đây.
+  // Effect để vẽ QR Code trong modal (để xem trước) và tạo Data URL cho bản in
   useEffect(() => {
-    // Kiểm tra xem QRCode có sẵn trong môi trường hiện tại không
-    // Nếu không, có thể do bundler loại bỏ hoặc cấu hình chưa đúng.
-    // Đối với bản in, chúng ta sẽ tải lại thư viện qrcode trong cửa sổ in.
-    if (qrCanvasRef.current && typeof (window as any).QRCode !== 'undefined') {
-      const qrValue = generateQrCodeData(caseItem);
-      (window as any).QRCode.toCanvas(qrCanvasRef.current, qrValue, {
-        width: 100, // Kích thước QR code trên modal
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
+    const generateAndSetQrCode = async () => {
+      if (qrCanvasRef.current) {
+        try {
+          const qrValue = generateQrCodeData(caseItem);
+          // Vẽ lên canvas để xem trước trong modal
+          await QRCode.toCanvas(qrCanvasRef.current, qrValue, {
+            width: 100,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          });
+
+          // Tạo Data URL (base64) để nhúng vào bản in
+          const dataUrl = await QRCode.toDataURL(qrValue, {
+            width: 100, // Kích thước QR code trong bản in
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          });
+          setQrImageUrl(dataUrl); // Lưu Data URL vào state
+        } catch (error) {
+          console.error('Lỗi khi tạo QR Code:', error);
+          setQrImageUrl(null);
         }
-      }, function (error: any) {
-        if (error) console.error('Lỗi khi tạo QR Code trong modal:', error);
-      });
-    }
+      }
+    };
+
+    generateAndSetQrCode();
   }, [caseItem]);
 
   const formatDate = (dateString: string | undefined) => {
@@ -74,39 +90,17 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
         `);
         printWindow.document.write('</head><body>');
         printWindow.document.write('<div class="report-container">');
-        printWindow.document.write(reportContentRef.current.innerHTML); // Ghi nội dung từ modal vào cửa sổ in
+        // Ghi nội dung từ ref vào cửa sổ in
+        printWindow.document.write(reportContentRef.current.innerHTML);
         printWindow.document.write('</div>');
-
-        // Tải lại thư viện qrcode trong cửa sổ in
-        printWindow.document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.0.0/qrcode.min.js"></script>');
-        printWindow.document.write('<script>');
-        printWindow.document.write(`
-          document.addEventListener('DOMContentLoaded', function() {
-            var qrCanvasPrint = document.getElementById('qrCanvasPrint');
-            if (qrCanvasPrint && typeof QRCode !== 'undefined') {
-              var qrValue = '${generateQrCodeData(caseItem)}'; // Lấy dữ liệu QR từ hàm của bạn
-              new QRCode(qrCanvasPrint, {
-                text: qrValue,
-                width: 100, // Kích thước QR code trong bản in
-                height: 100,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-              });
-            } else {
-                console.error('Không tìm thấy canvas in hoặc QRCode chưa sẵn sàng trong cửa sổ in.');
-            }
-            // Đảm bảo QR code được render trước khi in
-            setTimeout(function() {
-              window.print();
-              window.onafterprint = () => window.close();
-            }, 500);
-          });
-        `);
-        printWindow.document.write('</script>');
         printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.focus();
+        // Đợi một chút để nội dung được render trước khi in
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.onafterprint = () => printWindow.close();
+        }, 500);
       }
     }
   };
@@ -171,10 +165,13 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
             </div>
           )}
 
-          {/* Canvas này sẽ được sử dụng cho bản in */}
+          {/* Hiển thị QR Code trong modal bằng canvas (để xem trước) */}
           <div className="qr-code-container mt-8 flex flex-col items-center">
             <h3 className="text-lg font-semibold mb-2">Mã QR Vụ án</h3>
-            <canvas id="qrCanvasPrint" className="border border-gray-300 rounded-md p-2"></canvas>
+            {/* Sử dụng canvas để hiển thị QR trong modal */}
+            <canvas ref={qrCanvasRef} className="border border-gray-300 rounded-md p-2"></canvas>
+            {/* Thẻ img ẩn chứa Data URL của QR để sử dụng trong bản in */}
+            {qrImageUrl && <img src={qrImageUrl} alt="QR Code Vụ án" className="hidden" id="qrImageForPrint" />}
             <p className="text-sm text-gray-600 mt-2">ID Vụ án: {caseItem.id}</p>
           </div>
         </div>
