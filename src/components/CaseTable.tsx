@@ -1,17 +1,17 @@
 // ./components/CaseTable.tsx
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer } from 'lucide-react'; // THÊM Printer icon
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, FileText } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 import NotesModal from './NotesModal';
 import ExtensionModal from './ExtensionModal';
-import QRCodeDisplayModal from './QRCodeDisplayModal'; // Import modal hiển thị QR
-import { generateQrCodeData } from '../utils/qrUtils'; // Import hàm tiện ích
+import QRCodeDisplayModal from './QRCodeDisplayModal';
+import { generateQrCodeData } from '../utils/qrUtils'; // Đường dẫn tương đối đến qrUtils
 
 interface CaseTableProps {
   cases: Case[];
   columns: {
-    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant'; // THÊM 'isImportant' vào key
+    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant';
     label: string;
     render?: (caseItem: Case) => React.ReactNode;
   }[];
@@ -19,8 +19,9 @@ interface CaseTableProps {
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onUpdateCase: (updatedCase: Case) => void;
   onEditCase: (caseItem: Case) => void;
-  onToggleImportant: (caseId: string, isImportant: boolean) => void; // CẬP NHẬT PROP NÀY để truyền trạng thái mới
+  onToggleImportant: (caseId: string, isImportant: boolean) => void;
   showWarnings?: boolean;
+  onViewReport: (caseItem: Case) => void; // THÊM PROP MỚI
 }
 
 const CaseTable: React.FC<CaseTableProps> = ({
@@ -30,8 +31,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
   onTransferStage,
   onUpdateCase,
   onEditCase,
-  onToggleImportant, // NHẬN PROP MỚI
-  showWarnings = false
+  onToggleImportant,
+  showWarnings = false,
+  onViewReport // NHẬN PROP MỚI
 }) => {
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -143,7 +145,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => setConfirmDelete(caseItem.id)} // Đã chuyển nút xóa vào đây
+          onClick={() => setConfirmDelete(caseItem.id)}
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
@@ -162,6 +164,19 @@ const CaseTable: React.FC<CaseTableProps> = ({
       >
         <Printer size={12} />
         In QR
+      </button>
+    );
+
+    // THÊM NÚT XUẤT BÁO CÁO VỤ ÁN
+    actions.push(
+      <button
+        key="view-report"
+        onClick={() => onViewReport(caseItem)}
+        className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 transition-colors whitespace-nowrap"
+        title="Xem và xuất báo cáo vụ án"
+      >
+        <FileText size={12} />
+        Báo cáo
       </button>
     );
 
@@ -224,10 +239,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return `${shortestDetentionDays} ngày`;
       case 'notes':
         return renderNotesCell(caseItem);
-      case 'isImportant': // THÊM CASE NÀY
+      case 'isImportant':
         return (
           <button
-            onClick={() => onToggleImportant(caseItem.id, !caseItem.isImportant)} // CẬP NHẬT onToggleImportant
+            onClick={() => onToggleImportant(caseItem.id, !caseItem.isImportant)}
             className={`p-1 rounded-full transition-colors ${
               caseItem.isImportant ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-500'
             }`}
@@ -328,7 +343,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Mở rộng
               </th>
-              {/* THÊM CỘT MỚI CHO STAR */}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Quan trọng
               </th>
@@ -365,7 +379,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         )}
                       </button>
                     </td>
-                    {/* RENDER NÚT STAR */}
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
                     </td>
@@ -377,7 +390,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                   </tr>
                   {expandedCases.has(caseItem.id) && (
                     <tr>
-                      <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50"> {/* CỘT +2 (mở rộng + quan trọng) */}
+                      <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-2">
                           <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                           {caseItem.defendants.map((defendant, index) => (
