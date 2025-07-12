@@ -6,7 +6,7 @@ import NotesModal from './NotesModal'; // Giả sử bạn đã có component n�
 import ExtensionModal from './ExtensionModal'; // Giả sử bạn đã có component này
 import QRCodeDisplayModal from './QRCodeDisplayModal'; // Giả sử bạn đã có component này
 import { generateQrCodeData } from '../utils/qrUtils';
-import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils'; // Cần import lại nếu sử dụng
+import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 
 interface CaseDetailModalProps {
   caseItem: Case;
@@ -34,7 +34,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   } | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // State cho modal xác nhận xóa
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -63,7 +63,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             onClick={() => {
               if (window.confirm('Bạn có chắc chắn muốn chuyển sang giai đoạn Truy tố?')) {
                 onTransferStage(caseItem.id, 'Truy tố');
-                onClose(); // Đóng modal sau khi chuyển giai đoạn
+                onClose();
               }
             }}
             className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
@@ -145,7 +145,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => setConfirmDelete(caseItem.id)} // Mở modal xác nhận xóa
+          onClick={() => setConfirmDelete(caseItem.id)}
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
@@ -166,27 +166,23 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         >
           <X size={24} />
         </button>
-        <h2 className="text-2xl font-bold mb-4">Chi tiết Vụ án: {formData.name}</h2>
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+          Chi tiết Vụ án: {formData.name}
+          <button
+            onClick={() => onToggleImportant(formData.id, !formData.isImportant)}
+            className={`flex items-center ${formData.isImportant ? 'text-yellow-500' : 'text-gray-400'} hover:text-yellow-600 transition-colors`}
+            title={formData.isImportant ? 'Hủy Quan trọng' : 'Đánh dấu Quan trọng'}
+          >
+            <Star size={20} fill={formData.isImportant ? 'currentColor' : 'none'} />
+          </button>
+        </h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Left Column for Case Details */}
           <div className="lg:col-span-2">
             {/* Form chỉnh sửa chi tiết vụ án */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="caseName" className="block text-sm font-medium text-gray-700">Tên vụ án</label>
-                <input
-                  type="text"
-                  id="caseName"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
-                />
-              </div>
-              {/* Removed "Số vụ án" field */}
-              <div></div> {/* Empty div to maintain grid layout */}
-
+              {/* Tội danh (new ô 1) */}
               <div>
                 <label htmlFor="charges" className="block text-sm font-medium text-gray-700">Tội danh</label>
                 <textarea
@@ -198,6 +194,19 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
                 ></textarea>
               </div>
+              {/* Tên vụ án (new ô 2) */}
+              <div>
+                <label htmlFor="caseName" className="block text-sm font-medium text-gray-700">Tên vụ án</label>
+                <input
+                  type="text"
+                  id="caseName"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                />
+              </div>
+
               <div>
                 <label htmlFor="prosecutor" className="block text-sm font-medium text-gray-700">Kiểm sát viên</label>
                 <input
@@ -268,13 +277,6 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 <Save size={16} /> Lưu Thay đổi
               </button>
               <button
-                onClick={() => onToggleImportant(formData.id, !formData.isImportant)}
-                className={`px-4 py-2 rounded-md ${formData.isImportant ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-gray-500 hover:bg-gray-600'} text-white flex items-center gap-2`}
-              >
-                <Star size={16} fill={formData.isImportant ? 'currentColor' : 'none'} />
-                {formData.isImportant ? 'Hủy Quan trọng' : 'Đánh dấu Quan trọng'}
-              </button>
-              <button
                 onClick={() => setNotesCase(formData)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
                 title="Xem/Sửa ghi chú"
@@ -306,24 +308,22 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               {formData.defendants && formData.defendants.length > 0 ? (
                 <div className="space-y-2">
                   {formData.defendants.map(defendant => (
-                    <div key={defendant.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-gray-50 p-3 rounded-md">
-                      <p className="text-sm mb-2 sm:mb-0">
-                        <strong>{defendant.name}</strong> - Tội danh: {defendant.charges}
-                        {defendant.preventiveMeasure && ` - Biện pháp ngăn chặn: ${defendant.preventiveMeasure}`}
+                    <div key={defendant.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md text-sm">
+                      <p className="flex-grow">
+                        <strong>{defendant.name}</strong> - Điều 120.
+                        {defendant.preventiveMeasure && ` - BPNC: ${defendant.preventiveMeasure}`}
                         {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                          <span> - Hạn tạm giam: {defendant.detentionDeadline}
-                            <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                              ({getDaysRemaining(defendant.detentionDeadline)} ngày)
-                            </span>
+                          <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                            (Hạn tạm giam: {defendant.detentionDeadline} - {getDaysRemaining(defendant.detentionDeadline)} ngày)
                           </span>
                         )}
                       </p>
                       {defendant.preventiveMeasure === 'Tạm giam' && (
                         <button
                           onClick={() => setExtensionModal({ case: formData, type: 'detention', defendant })}
-                          className="px-3 py-1 text-xs bg-orange-600 text-white rounded-md hover:bg-orange-700 flex items-center justify-center gap-1 mt-2 sm:mt-0"
+                          className="px-2 py-0.5 text-xs bg-orange-600 text-white rounded-md hover:bg-orange-700 flex items-center gap-1 ml-2 flex-shrink-0"
                         >
-                          <Clock size={12} /> Gia hạn Tạm giam
+                          <Clock size={10} /> Gia hạn TG
                         </button>
                       )}
                     </div>
@@ -341,7 +341,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       {notesCase && (
         <NotesModal
           case={notesCase}
-          onSave={onUpdateCase} // NotesModal sẽ gọi onUpdateCase để lưu ghi chú
+          onSave={onUpdateCase}
           onClose={() => setNotesCase(null)}
         />
       )}
@@ -352,7 +352,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           case={extensionModal.case}
           type={extensionModal.type}
           defendant={extensionModal.defendant}
-          onSave={onUpdateCase} // ExtensionModal sẽ gọi onUpdateCase để cập nhật vụ án/bị can
+          onSave={onUpdateCase}
           onClose={() => setExtensionModal(null)}
         />
       )}
@@ -385,7 +385,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 onClick={() => {
                   onDeleteCase(confirmDelete);
                   setConfirmDelete(null);
-                  onClose(); // Đóng cả CaseDetailModal sau khi xóa thành công
+                  onClose();
                 }}
                 className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
               >
