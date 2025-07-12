@@ -14,7 +14,7 @@ interface CaseReportModalProps {
 
 const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) => {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null); // Ref cho canvas trong modal (để xem trước)
-  const reportContentRef = useRef<HTMLDivElement>(null); // Ref cho nội dung báo cáo để in
+  const printContentRef = useRef<HTMLDivElement>(null); // Ref cho nội dung báo cáo để in
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null); // State để lưu trữ Data URL của QR Code
 
   // Effect để vẽ QR Code trong modal (để xem trước) và tạo Data URL cho bản in
@@ -66,111 +66,148 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
   };
 
   const handlePrintReport = () => {
-    if (qrImageUrl) { // Đảm bảo qrImageUrl đã có
-      const printWindow = window.open('', '', 'height=800,width=800');
-      if (printWindow) {
-        let defendantsHtml = '';
-        if (caseItem.defendants && caseItem.defendants.length > 0) {
-          defendantsHtml += `<div class="defendant-section" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-                                <h3 style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px;">DANH SÁCH BỊ CAN</h3>`;
-          caseItem.defendants.forEach((defendant, index) => {
-            defendantsHtml += `<div style="border: 1px solid #eee; padding: 8px; margin-bottom: 8px; border-radius: 4px; font-size: 0.9em;">
-                                  <p style="margin-bottom: 4px;"><span style="font-weight: bold;">Tên:</span> ${defendant.name}</p>
-                                  <p style="margin-bottom: 4px;"><span style="font-weight: bold;">Tội danh:</span> ${defendant.charges}</p>
-                                  <p style="margin-bottom: 4px;"><span style="font-weight: bold;">Biện pháp ngăn chặn:</span> ${defendant.preventiveMeasure}</p>`;
-            if (defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline) {
-              defendantsHtml += `<p><span style="font-weight: bold;">Thời hạn tạm giam:</span> ${formatDate(defendant.detentionDeadline)}</p>`;
-            }
-            defendantsHtml += `</div>`;
-          });
-          defendantsHtml += `</div>`;
-        }
-
-        const printContent = `
-          <div class="report-container" style="position: relative; width: 190mm; min-height: 277mm; margin: auto; padding: 15mm; box-sizing: border-box; font-size: 10pt; line-height: 1.4;">
-            <h2 style="font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 15px;">THÔNG TIN VỤ ÁN</h2>
-
-            <div class="qr-code-print-container" style="position: absolute; top: 15mm; right: 15mm; text-align: center;">
-              <img src="${qrImageUrl}" alt="Mã QR Vụ án" style="width: 80px; height: 80px; border: 1px solid #ccc; padding: 2px; display: block; margin: 0 auto;">
-              <p style="font-size: 8pt; color: #666; margin-top: 5px;">ID Vụ án: ${caseItem.id}</p>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; margin-bottom: 15px;">
-              <div style="display: flex; align-items: flex-start;">
-                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">TÊN VỤ ÁN:</span>
-                <span style="flex-grow: 1;">${caseItem.name}</span>
-              </div>
-              <div style="display: flex; align-items: flex-start;">
-                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">ĐIỀU LUẬT:</span>
-                <span style="flex-grow: 1;">${caseItem.charges}</span>
-              </div>
-              <div style="display: flex; align-items: flex-start;">
-                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">HẠN ĐIỀU TRA:</span>
-                <span style="flex-grow: 1;">${formatDate(caseItem.investigationDeadline)}</span>
-              </div>
-              <div style="display: flex; align-items: flex-start;">
-                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">KSV:</span>
-                <span style="flex-grow: 1;">
-                  ${caseItem.prosecutor}
-                  ${caseItem.supportingProsecutors && caseItem.supportingProsecutors.length > 0 ?
-                    ` (Hỗ trợ: ${caseItem.supportingProsecutors.join(', ')})` : ''}
-                </span>
-              </div>
-              <div style="display: flex; align-items: flex-start; grid-column: span 2;">
-                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">GHI CHÚ:</span>
-                <span style="flex-grow: 1;">${caseItem.notes || 'Không có'}</span>
-              </div>
-            </div>
-
-            ${defendantsHtml}
-          </div>
-        `;
-
-        printWindow.document.write('<html><head><title>Báo cáo Vụ án</title>');
-        printWindow.document.write(`
-          <style>
-            @page {
-              size: A4;
-              margin: 0;
-            }
-            body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
-            .report-container { width: 210mm; min-height: 297mm; margin: 0; padding: 15mm; box-sizing: border-box; font-size: 10pt; line-height: 1.4; position: relative; }
-            h2 { font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 15px; }
-            h3 { font-size: 12pt; font-weight: bold; margin-bottom: 10px; }
-            .info-row { display: flex; margin-bottom: 5px; }
-            .info-label { font-weight: bold; width: 100px; flex-shrink: 0; }
-            .info-value { flex-grow: 1; }
-            .defendant-section { margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px; }
-            .defendant-item { border: 1px solid #eee; padding: 8px; margin-bottom: 8px; border-radius: 4px; }
-            .qr-code-print-container { position: absolute; top: 15mm; right: 15mm; text-align: center; }
-            .qr-code-print-container img { display: block; margin: 0 auto; } /* Center image */
-            @media print {
-              body { -webkit-print-color-adjust: exact; }
-              .no-print { display: none; }
-            }
-          </style>
-        `);
-        printWindow.document.write('</head><body>');
-        printWindow.document.write(printContent); // Ghi nội dung đã tạo vào cửa sổ in
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-          printWindow.onafterprint = () => printWindow.close();
-        }, 500);
-      }
-    } else {
-      console.error("Không thể in báo cáo: Mã QR chưa được tạo hoặc nội dung báo cáo không có sẵn.");
-      // Có thể hiển thị một thông báo lỗi cho người dùng ở đây
+    if (!printContentRef.current || !qrImageUrl) {
       alert("Không thể tạo báo cáo. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
+      return;
     }
+
+    // Tạo một container tạm thời để chứa nội dung in
+    const printContainer = document.createElement('div');
+    printContainer.className = 'print-only-container'; // Class để kiểm soát hiển thị bằng CSS
+    
+    // Lấy nội dung HTML từ ref của modal và thêm vào container in
+    // CloneNode(true) để sao chép cả phần tử con
+    const contentToPrint = printContentRef.current.cloneNode(true) as HTMLElement;
+    
+    // Tìm và ẩn canvas QR code trong bản in (chúng ta sẽ dùng img Data URL thay thế)
+    const qrCanvasInPrintContent = contentToPrint.querySelector('.qr-code-container canvas');
+    if (qrCanvasInPrintContent) {
+      qrCanvasInPrintContent.remove(); // Xóa canvas khỏi bản sao để in
+    }
+
+    // Tìm và hiển thị img QR code trong bản in
+    const qrImageInPrintContent = contentToPrint.querySelector('.qr-code-print-container');
+    if (qrImageInPrintContent) {
+      qrImageInPrintContent.classList.remove('hidden'); // Hiển thị img QR code trong bản in
+    }
+
+    printContainer.appendChild(contentToPrint);
+    document.body.appendChild(printContainer);
+
+    // Thêm style dành riêng cho in một cách động
+    const style = document.createElement('style');
+    style.id = 'print-styles';
+    style.innerHTML = `
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      /* Ẩn tất cả các phần tử khác trừ container in */
+      body > *:not(.print-only-container) {
+        display: none !important;
+      }
+      .print-only-container {
+        display: block !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 210mm; /* Chiều rộng A4 */
+        min-height: 297mm; /* Chiều cao A4 */
+        margin: 0;
+        padding: 15mm; /* Padding cho nội dung bên trong trang A4 */
+        box-sizing: border-box;
+        font-family: 'Inter', sans-serif;
+        font-size: 10pt;
+        line-height: 1.4;
+        color: #333;
+        background-color: #fff; /* Đảm bảo nền trắng khi in */
+      }
+      .report-header {
+        font-size: 16pt;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 15px;
+      }
+      .qr-code-print-container {
+        position: absolute;
+        top: 15mm;
+        right: 15mm;
+        text-align: center;
+        z-index: 1000; /* Đảm bảo nó nằm trên cùng */
+      }
+      .qr-code-print-container img {
+        width: 80px;
+        height: 80px;
+        border: 1px solid #ccc;
+        padding: 2px;
+        display: block;
+        margin: 0 auto;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 15px;
+        margin-bottom: 15px;
+      }
+      .info-row {
+        display: flex;
+        align-items: flex-start;
+      }
+      .info-label {
+        font-weight: bold;
+        width: 80px; /* Điều chỉnh chiều rộng cho nhãn */
+        flex-shrink: 0;
+      }
+      .info-value {
+        flex-grow: 1;
+      }
+      .full-width-info {
+        grid-column: span 2;
+      }
+      .defendant-section {
+        margin-top: 15px;
+        padding-top: 10px;
+        border-top: 1px dashed #ccc;
+      }
+      .defendant-header {
+        font-size: 12pt;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      .defendant-item {
+        border: 1px solid #eee;
+        padding: 8px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+      /* Ẩn các phần tử không cần thiết khi in */
+      .no-print {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Kích hoạt hộp thoại in
+    window.print();
+
+    // Dọn dẹp sau khi hộp thoại in được đóng
+    const afterPrintHandler = () => {
+      document.body.removeChild(printContainer);
+      const oldStyle = document.getElementById('print-styles');
+      if (oldStyle) {
+        document.head.removeChild(oldStyle);
+      }
+      window.removeEventListener('afterprint', afterPrintHandler);
+    };
+    window.addEventListener('afterprint', afterPrintHandler);
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
-        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex justify-between items-center z-10">
+        {/* Header của Modal - Ẩn khi in */}
+        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex justify-between items-center z-10 no-print">
           <h3 className="text-xl font-semibold text-gray-800">Báo cáo Thông tin Vụ án</h3>
           <button
             onClick={onClose}
@@ -181,41 +218,48 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
           </button>
         </div>
 
-        <div ref={reportContentRef} className="p-6 text-gray-800">
-          <h2 className="text-2xl font-bold text-center mb-6">THÔNG TIN VỤ ÁN</h2>
+        {/* Nội dung báo cáo - sẽ được sao chép để in */}
+        <div ref={printContentRef} className="p-6 text-gray-800">
+          <h2 className="text-2xl font-bold text-center mb-6 report-header">THÔNG TIN VỤ ÁN</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 mb-6">
-            <div className="flex items-start">
-              <span className="font-semibold w-32 flex-shrink-0">TÊN VỤ ÁN:</span>
-              <span className="flex-grow">{caseItem.name}</span>
+          {/* QR Code cho bản in (mặc định ẩn, chỉ hiển thị khi in) */}
+          <div className="qr-code-print-container hidden">
+            {qrImageUrl && <img src={qrImageUrl} alt="Mã QR Vụ án" />}
+            <p style={{ fontSize: '8pt', color: '#666', marginTop: '5px' }}>ID Vụ án: {caseItem.id}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 mb-6 info-grid">
+            <div className="flex items-start info-row">
+              <span className="font-semibold w-32 flex-shrink-0 info-label">TÊN VỤ ÁN:</span>
+              <span className="flex-grow info-value">{caseItem.name}</span>
             </div>
-            <div className="flex items-start">
-              <span className="font-semibold w-32 flex-shrink-0">ĐIỀU LUẬT:</span>
-              <span className="flex-grow">{caseItem.charges}</span>
+            <div className="flex items-start info-row">
+              <span className="font-semibold w-32 flex-shrink-0 info-label">ĐIỀU LUẬT:</span>
+              <span className="flex-grow info-value">{caseItem.charges}</span>
             </div>
-            <div className="flex items-start">
-              <span className="font-semibold w-32 flex-shrink-0">HẠN ĐIỀU TRA:</span>
-              <span className="flex-grow">{formatDate(caseItem.investigationDeadline)}</span>
+            <div className="flex items-start info-row">
+              <span className="font-semibold w-32 flex-shrink-0 info-label">HẠN ĐIỀU TRA:</span>
+              <span className="flex-grow info-value">{formatDate(caseItem.investigationDeadline)}</span>
             </div>
-            <div className="flex items-start">
-              <span className="font-semibold w-32 flex-shrink-0">KSV:</span>
-              <span className="flex-grow">
+            <div className="flex items-start info-row">
+              <span className="font-semibold w-32 flex-shrink-0 info-label">KSV:</span>
+              <span className="flex-grow info-value">
                 {caseItem.prosecutor}
                 {caseItem.supportingProsecutors && caseItem.supportingProsecutors.length > 0 &&
                   ` (Hỗ trợ: ${caseItem.supportingProsecutors.join(', ')})`}
               </span>
             </div>
-            <div className="flex items-start col-span-full">
-              <span className="font-semibold w-32 flex-shrink-0">GHI CHÚ:</span>
-              <span className="flex-grow">{caseItem.notes || 'Không có'}</span>
+            <div className="flex items-start col-span-full info-row full-width-info">
+              <span className="font-semibold w-32 flex-shrink-0 info-label">GHI CHÚ:</span>
+              <span className="flex-grow info-value">{caseItem.notes || 'Không có'}</span>
             </div>
           </div>
 
           {caseItem.defendants && caseItem.defendants.length > 0 && (
             <div className="defendant-section mt-6 pt-4 border-t border-gray-200">
-              <h3 className="text-xl font-semibold mb-4">DANH SÁCH BỊ CAN</h3>
+              <h3 className="text-xl font-semibold mb-4 defendant-header">DANH SÁCH BỊ CAN</h3>
               {caseItem.defendants.map((defendant, index) => (
-                <div key={defendant.id || index} className="border border-gray-200 rounded-md p-4 mb-4 bg-gray-50">
+                <div key={defendant.id || index} className="border border-gray-200 rounded-md p-4 mb-4 bg-gray-50 defendant-item">
                   <p className="mb-2"><span className="font-semibold">Tên:</span> {defendant.name}</p>
                   <p className="mb-2"><span className="font-semibold">Tội danh:</span> {defendant.charges}</p>
                   <p className="mb-2"><span className="font-semibold">Biện pháp ngăn chặn:</span> {defendant.preventiveMeasure}</p>
@@ -227,17 +271,15 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
             </div>
           )}
 
-          {/* Hiển thị QR Code trong modal bằng canvas (để xem trước) */}
-          <div className="qr-code-container mt-8 flex flex-col items-center">
+          {/* QR Code cho hiển thị modal (mặc định hiển thị, ẩn khi in) */}
+          <div className="qr-code-container mt-8 flex flex-col items-center no-print">
             <h3 className="text-lg font-semibold mb-2">Mã QR Vụ án</h3>
-            {/* Sử dụng canvas để hiển thị QR trong modal */}
             <canvas ref={qrCanvasRef} className="border border-gray-300 rounded-md p-2"></canvas>
-            {/* Thẻ img ẩn chứa Data URL của QR để sử dụng trong bản in */}
-            {qrImageUrl && <img src={qrImageUrl} alt="QR Code Vụ án" className="hidden" id="qrImageForPrint" />}
             <p className="text-sm text-gray-600 mt-2">ID Vụ án: {caseItem.id}</p>
           </div>
         </div>
 
+        {/* Footer của Modal với các nút hành động - Ẩn khi in */}
         <div className="sticky bottom-0 bg-white p-4 border-t border-gray-200 flex justify-end gap-3 no-print">
           <button
             onClick={handlePrintReport}
