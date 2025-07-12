@@ -8,6 +8,18 @@ import QRCodeDisplayModal from './QRCodeDisplayModal';
 import { generateQrCodeData } from '../utils/qrUtils';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 
+// Helper function to format date from YYYY-MM-DD to DD/MM/YYYY for display
+const formatDateToDDMMYYYY = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    console.error("Error formatting date:", dateString, error);
+    return dateString; // Return original if parsing fails
+  }
+};
+
 // New StageDateModal component for date input
 interface StageDateModalProps {
   onClose: () => void;
@@ -62,8 +74,8 @@ interface CaseDetailModalProps {
   caseItem: Case;
   onClose: () => void;
   onUpdateCase: (updatedCase: Case) => void;
-  onDeleteCase: (caseId: string) => void; // Keep for now, but not used by stage actions
-  onTransferStage: (caseId: string, newStage: Case['stage']) => void; // Will be less used for direct calls
+  onDeleteCase: (caseId: string) => void;
+  onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onToggleImportant: (caseId: string, isImportant: boolean) => void;
 }
 
@@ -71,8 +83,6 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   caseItem,
   onClose,
   onUpdateCase,
-  // onDeleteCase, // Not used by stage actions anymore
-  // onTransferStage, // Not directly called by stage action buttons anymore
   onToggleImportant,
 }) => {
   const [formData, setFormData] = useState<Case>(caseItem);
@@ -85,7 +95,6 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
 
-  // New state for the stage date input modal
   const [stageDateModalInfo, setStageDateModalInfo] = useState<{ targetStage: Case['stage'] } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -104,7 +113,6 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
     setShowQrModal(true);
   };
 
-  // Function to handle saving date and updating stage in formData
   const handleStageDateSave = (date: string, targetStage: Case['stage']) => {
     setFormData(prev => ({
       ...prev,
@@ -184,7 +192,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => setStageDateModalInfo({ targetStage: 'Đình chỉ' })} // Now also uses the date modal
+          onClick={() => setStageDateModalInfo({ targetStage: 'Đình chỉ' })}
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
@@ -262,7 +270,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   <label htmlFor="investigationDeadline" className="block text-sm font-medium text-gray-700">Thời hạn Điều tra</label>
                   {formData.investigationDeadline ? (
                     <span className="mt-1 block w-full p-2 text-sm">
-                      {formData.investigationDeadline}
+                      {formatDateToDDMMYYYY(formData.investigationDeadline)} {/* Formatted for display */}
                       <span className={`ml-1 ${isExpiringSoon(formData.investigationDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                         ({getDaysRemaining(formData.investigationDeadline)} ngày)
                       </span>
@@ -353,7 +361,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         <p className="text-sm text-gray-700">Điều 120.</p>
                         {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline ? (
                           <div className="text-sm text-gray-800 mt-1">
-                            BPNC: Tạm giam - {defendant.detentionDeadline}
+                            BPNC: Tạm giam - {formatDateToDDMMYYYY(defendant.detentionDeadline)} {/* Formatted for display */}
                             <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                               ({getDaysRemaining(defendant.detentionDeadline)} ngày)
                             </span>
