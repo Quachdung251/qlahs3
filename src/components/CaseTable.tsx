@@ -1,6 +1,6 @@
 // ./components/CaseTable.tsx
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer } from 'lucide-react'; // THÊM Printer icon
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 import NotesModal from './NotesModal';
@@ -11,7 +11,7 @@ import { generateQrCodeData } from '../utils/qrUtils'; // Import hàm tiện íc
 interface CaseTableProps {
   cases: Case[];
   columns: {
-    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant'; // THÊM 'isImportant' vào key
+    key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant';
     label: string;
     render?: (caseItem: Case) => React.ReactNode;
   }[];
@@ -19,7 +19,7 @@ interface CaseTableProps {
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
   onUpdateCase: (updatedCase: Case) => void;
   onEditCase: (caseItem: Case) => void;
-  onToggleImportant: (caseId: string, isImportant: boolean) => void; // CẬP NHẬT PROP NÀY để truyền trạng thái mới
+  onToggleImportant: (caseId: string, isImportant: boolean) => void;
   showWarnings?: boolean;
 }
 
@@ -30,7 +30,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
   onTransferStage,
   onUpdateCase,
   onEditCase,
-  onToggleImportant, // NHẬN PROP MỚI
+  onToggleImportant,
   showWarnings = false
 }) => {
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
@@ -43,9 +43,8 @@ const CaseTable: React.FC<CaseTableProps> = ({
     defendant?: Defendant;
   } | null>(null);
 
-  // State mới cho modal hiển thị QR Code
   const [showQrModal, setShowQrModal] = useState(false);
-  const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
+  const [qrCaseDataForDisplay, setQrCaseDataForDisplay] = useState<Case | null>(null); // Lưu toàn bộ Case object
 
   const toggleExpanded = (caseId: string) => {
     const newExpanded = new Set(expandedCases);
@@ -67,10 +66,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
     setExpandedActions(newExpanded);
   };
 
-  // Hàm xử lý in nhãn QR Code cho vụ án hiện có
+  // Hàm xử lý hiển thị modal in QR Code cho vụ án hiện có
   const handlePrintExistingQR = (caseItem: Case) => {
-    const qrValue = generateQrCodeData(caseItem);
-    setQrCaseData({ qrValue, caseName: caseItem.name });
+    setQrCaseDataForDisplay(caseItem); // Lưu toàn bộ Case object
     setShowQrModal(true);
   };
 
@@ -116,7 +114,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         break;
     }
 
-    // Add other actions for active stages
     if (!['Hoàn thành', 'Đình chỉ', 'Chuyển đi'].includes(caseItem.stage)) {
       actions.push(
         <button
@@ -143,7 +140,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       actions.push(
         <button
           key="discontinue"
-          onClick={() => setConfirmDelete(caseItem.id)} // Đã chuyển nút xóa vào đây
+          onClick={() => setConfirmDelete(caseItem.id)}
           className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors whitespace-nowrap"
         >
           <Trash2 size={12} />
@@ -152,25 +149,12 @@ const CaseTable: React.FC<CaseTableProps> = ({
       );
     }
 
-    // Thêm nút In nhãn QR Code vào danh sách hành động
-    actions.push(
-      <button
-        key="print-qr"
-        onClick={() => handlePrintExistingQR(caseItem)}
-        className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
-        title="In nhãn QR Code"
-      >
-        <Printer size={12} />
-        In QR
-      </button>
-    );
-
     return actions;
   };
 
   const renderCaseNameCell = (caseItem: Case) => {
     return (
-      <div className="max-w-xs">
+      <div className="max-w-[150px] truncate" title={caseItem.name}> {/* Giảm chiều rộng */}
         <div className="font-medium text-gray-900 truncate" title={caseItem.name}>
           {caseItem.name}
         </div>
@@ -224,10 +208,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return `${shortestDetentionDays} ngày`;
       case 'notes':
         return renderNotesCell(caseItem);
-      case 'isImportant': // THÊM CASE NÀY
+      case 'isImportant':
         return (
           <button
-            onClick={() => onToggleImportant(caseItem.id, !caseItem.isImportant)} // CẬP NHẬT onToggleImportant
+            onClick={() => onToggleImportant(caseItem.id, !caseItem.isImportant)}
             className={`p-1 rounded-full transition-colors ${
               caseItem.isImportant ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-500'
             }`}
@@ -241,53 +225,59 @@ const CaseTable: React.FC<CaseTableProps> = ({
         const isExpanded = expandedActions.has(caseItem.id);
 
         return (
-          <div className="relative">
-            <div className="flex items-center gap-1">
-              {/* Always show Edit button, now calling onEditCase prop */}
+          <div className="relative flex items-center gap-1">
+            {/* Nút Sửa */}
+            <button
+              onClick={() => onEditCase(caseItem)}
+              className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
+            >
+              <Edit2 size={12} />
+              Sửa
+            </button>
+
+            {/* Nút In QR - Đặt riêng ra ngoài */}
+            <button
+              onClick={() => handlePrintExistingQR(caseItem)}
+              className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
+              title="In QR Hồ Sơ"
+            >
+              <Printer size={12} />
+              In QR
+            </button>
+
+            {/* Nút Gia hạn ĐT (chỉ hiển thị khi ở giai đoạn Điều tra) */}
+            {caseItem.stage === 'Điều tra' && (
               <button
-                onClick={() => onEditCase(caseItem)}
-                className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
+                onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
+                className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowrap"
               >
-                <Edit2 size={12} />
-                Sửa
+                <Clock size={12} />
+                Gia hạn ĐT
               </button>
+            )}
 
-              {/* Extension button for investigation stage */}
-              {caseItem.stage === 'Điều tra' && (
-                <button
-                  onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
-                  className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowrap"
-                >
-                  <Clock size={12} />
-                  Gia hạn ĐT
-                </button>
-              )}
-
-              {/* Show first action if available */}
-              {stageActions.length > 0 && stageActions[0]}
-
-              {/* More actions button if there are additional actions (excluding the first one) */}
-              {stageActions.length > 1 && (
+            {/* Các hành động chuyển giai đoạn và các hành động khác */}
+            {stageActions.length > 0 && (
+              <div className="relative">
                 <button
                   onClick={() => toggleActions(caseItem.id)}
                   className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
+                  title="Thêm hành động"
                 >
                   <MoreHorizontal size={12} />
                 </button>
-              )}
-            </div>
 
-            {/* Expanded actions dropdown */}
-            {isExpanded && stageActions.length > 1 && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-max">
-                <div className="p-2 space-y-1">
-                  {/* Render all actions except the first one, which is already displayed */}
-                  {stageActions.slice(1).map((action, index) => (
-                    <div key={index} className="block">
-                      {action}
+                {isExpanded && (
+                  <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-max">
+                    <div className="p-2 space-y-1">
+                      {stageActions.map((action, index) => (
+                        <div key={index} className="block">
+                          {action}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -296,17 +286,16 @@ const CaseTable: React.FC<CaseTableProps> = ({
         if (column.render) {
           return column.render(caseItem);
         }
-        // Fallback for direct key access, ensuring it's a string or number
         const value = caseItem[column.key as keyof Case];
         return typeof value === 'string' || typeof value === 'number' ? value : '';
     }
   };
 
   const isRowHighlighted = (caseItem: Case) => {
-    if (caseItem.isImportant) { // Highlight if important
+    if (caseItem.isImportant) {
       return 'bg-blue-50';
     }
-    if (showWarnings) { // Highlight if expiring soon
+    if (showWarnings) {
       if (caseItem.stage === 'Điều tra' && isExpiringSoon(caseItem.investigationDeadline)) {
         return 'bg-yellow-50';
       }
@@ -316,7 +305,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
         return 'bg-yellow-50';
       }
     }
-    return ''; // No highlight
+    return '';
   };
 
   return (
@@ -328,7 +317,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Mở rộng
               </th>
-              {/* THÊM CỘT MỚI CHO STAR */}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Quan trọng
               </th>
@@ -365,7 +353,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         )}
                       </button>
                     </td>
-                    {/* RENDER NÚT STAR */}
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
                     </td>
@@ -377,7 +364,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                   </tr>
                   {expandedCases.has(caseItem.id) && (
                     <tr>
-                      <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50"> {/* CỘT +2 (mở rộng + quan trọng) */}
+                      <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-2">
                           <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
                           {caseItem.defendants.map((defendant, index) => (
@@ -397,7 +384,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                                     <div>
                                       <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
                                       <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                                        ({getDaysRemaining(defendant.detentionDeadline)} ngày)
+                                        ({getDaysRemaining(defendant.det detentionDeadline)} ngày)
                                       </span>
                                     </div>
                                     <button
@@ -423,7 +410,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         </table>
       </div>
 
-      {/* Notes Modal */}
       {notesCase && (
         <NotesModal
           case={notesCase}
@@ -432,7 +418,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         />
       )}
 
-      {/* Extension Modal */}
       {extensionModal && (
         <ExtensionModal
           case={extensionModal.case}
@@ -443,7 +428,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         />
       )}
 
-      {/* Confirmation Modal */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
@@ -473,10 +457,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
       )}
 
       {/* Modal hiển thị QR Code cho vụ án hiện có */}
-      {showQrModal && qrCaseData && (
+      {showQrModal && qrCaseDataForDisplay && (
         <QRCodeDisplayModal
-          qrCodeValue={qrCaseData.qrValue}
-          caseName={qrCaseData.caseName}
+          caseData={qrCaseDataForDisplay} // Truyền toàn bộ Case object
           onClose={() => setShowQrModal(false)}
         />
       )}
