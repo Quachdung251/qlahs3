@@ -1,6 +1,6 @@
 // ./components/CaseTable.tsx
-import React, { useState, useMemo } from 'react'; // THÊM useMemo
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react'; // THÊM Printer, ArrowUp, ArrowDown icons
+import React, { useState, useMemo } from 'react';
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Download, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 import NotesModal from './NotesModal';
@@ -14,7 +14,7 @@ interface CaseTableProps {
     key: keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'notes' | 'actions' | 'isImportant';
     label: string;
     render?: (caseItem: Case) => React.ReactNode;
-    sortable?: boolean; // THÊM PROP sortable
+    sortable?: boolean;
   }[];
   onDeleteCase: (caseId: string) => void;
   onTransferStage: (caseId: string, newStage: Case['stage']) => void;
@@ -24,7 +24,6 @@ interface CaseTableProps {
   showWarnings?: boolean;
 }
 
-// Định nghĩa kiểu cho trạng thái sắp xếp
 type SortKey = keyof Case | 'totalDefendants' | 'shortestDetention' | 'investigationRemaining' | 'shortestDetentionRemaining' | 'isImportant';
 type SortDirection = 'asc' | 'desc';
 
@@ -51,7 +50,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
 
-  // State cho sắp xếp
   const [sortConfig, setSortConfig] = useState<{ key: SortKey | null; direction: SortDirection | null }>({
     key: null,
     direction: null,
@@ -177,7 +175,8 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   const renderCaseNameCell = (caseItem: Case) => {
     return (
-      <div className="max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={`${caseItem.name} - ${caseItem.charges}`}> {/* THÊM title */}
+      // Sử dụng w-48 (hoặc một giá trị cố định) để đảm bảo chiều rộng và text-ellipsis
+      <div className="w-48 overflow-hidden text-ellipsis whitespace-nowrap" title={`${caseItem.name} - ${caseItem.charges}`}>
         <div className="font-medium text-gray-900">{caseItem.name}</div>
         <div className="text-sm text-gray-500">{caseItem.charges}</div>
       </div>
@@ -196,7 +195,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
           Ghi chú
         </button>
         {caseItem.notes && (
-          <div className="max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={caseItem.notes}> {/* THÊM title */}
+          <div className="max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={caseItem.notes}>
             <div className="text-sm text-gray-600">{caseItem.notes}</div>
           </div>
         )}
@@ -255,7 +254,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
               {caseItem.stage === 'Điều tra' && (
                 <button
                   onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
-                  className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowerep"
+                  className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowrap"
                 >
                   <Clock size={12} />
                   Gia hạn ĐT
@@ -313,7 +312,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
     return '';
   };
 
-  // Hàm xử lý sắp xếp
   const handleSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -322,7 +320,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
     setSortConfig({ key, direction });
   };
 
-  // Áp dụng sắp xếp vào danh sách cases
   const sortedCases = useMemo(() => {
     let sortableCases = [...cases];
     if (sortConfig.key) {
@@ -343,9 +340,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
             const aDetainedDefs = a.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
             const bDetainedDefs = b.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
             aValue = aDetainedDefs.length > 0 ? Math.min(...aDetainedDefs.map(d => getDaysRemaining(d.detentionDeadline!))) : Infinity;
-            bValue = bDetainedDefs.length > 0 ? Math.min(...bDetainedDefs.map(d => getDaysRemaining(d.detentionDeadline!))) : Infinity;
+            bValue = bDetainedDefs.length > 0 ? Math.min(...bDetainedDefs.map(d => getDaysRemaining(b.detentionDeadline!))) : Infinity;
             break;
-          case 'createdAt': // Sắp xếp theo ngày tạo (mới thêm vào)
+          case 'createdAt':
             aValue = new Date(a.createdAt).getTime();
             bValue = new Date(b.createdAt).getTime();
             break;
@@ -371,15 +368,15 @@ const CaseTable: React.FC<CaseTableProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="overflow-x-auto"> {/* Thêm div để tạo thanh cuộn ngang */}
-        <table className="w-full">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200"> {/* Đảm bảo bảng có chiều rộng tối thiểu */}
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20"> {/* Sticky cho cột đầu tiên */}
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20">
                 Mở rộng
               </th>
               <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer sticky left-[72px] bg-gray-50 z-20" // Điều chỉnh left offset
                 onClick={() => handleSort('isImportant')}
               >
                 <div className="flex items-center gap-1">
@@ -390,22 +387,13 @@ const CaseTable: React.FC<CaseTableProps> = ({
                 </div>
               </th>
               {columns.map((column) => {
-                // Bỏ qua cột 'isImportant' và 'actions' vì chúng đã được render riêng hoặc không cần sắp xếp trực tiếp từ tiêu đề
-                if (column.key === 'isImportant' || column.key === 'actions' || column.key === 'notes') {
-                  return (
-                    <th
-                      key={column.key}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {column.label}
-                    </th>
-                  );
-                }
+                if (column.key === 'isImportant') return null; // Không render lại cột này
+                const isSortable = column.sortable !== false && ['name', 'createdAt', 'investigationDeadline', 'shortestDetentionRemaining'].includes(column.key); // Ví dụ các cột có thể sắp xếp
                 return (
                   <th
                     key={column.key}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => column.sortable !== false && handleSort(column.key as SortKey)} // Chỉ sắp xếp nếu sortable không phải false
+                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isSortable ? 'cursor-pointer' : ''}`}
+                    onClick={() => isSortable && handleSort(column.key as SortKey)}
                   >
                     <div className="flex items-center gap-1">
                       {column.label}
@@ -429,7 +417,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
               sortedCases.map((caseItem) => (
                 <React.Fragment key={caseItem.id}>
                   <tr className={`${isRowHighlighted(caseItem)} hover:bg-gray-50`}>
-                    <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white z-10"> {/* Sticky cho cột đầu tiên */}
+                    <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white z-10">
                       <button
                         onClick={() => toggleExpanded(caseItem.id)}
                         className="text-gray-500 hover:text-gray-700"
@@ -441,12 +429,11 @@ const CaseTable: React.FC<CaseTableProps> = ({
                         )}
                       </button>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-gray-900 sticky left-[72px] bg-white z-10"> {/* Điều chỉnh left offset */}
                       {renderCellContent(caseItem, { key: 'isImportant', label: 'Quan trọng' })}
                     </td>
                     {columns.map((column) => {
-                       // Bỏ qua cột 'isImportant' vì nó đã được render riêng
-                      if (column.key === 'isImportant') return null;
+                       if (column.key === 'isImportant') return null;
                       return (
                         <td key={column.key} className="px-6 py-4 text-sm text-gray-900">
                           {renderCellContent(caseItem, column)}
@@ -456,6 +443,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                   </tr>
                   {expandedCases.has(caseItem.id) && (
                     <tr>
+                      {/* Cần điều chỉnh colSpan để phù hợp với số lượng cột hiện tại (bao gồm 2 cột sticky) */}
                       <td colSpan={columns.length + 2} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-2">
                           <h4 className="font-medium text-gray-900">Chi tiết Bị Can:</h4>
