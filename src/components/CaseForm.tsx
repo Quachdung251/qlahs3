@@ -1,6 +1,6 @@
 // ./components/CaseForm.tsx
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2, UserPlus } from 'lucide-react';
+import { Plus, Minus, User, FileText, Shield, Clock, X, Edit2, UserPlus, Printer } from 'lucide-react'; // Import Printer icon
 import { CaseFormData, Defendant, Case } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import AutocompleteInput from './AutocompleteInput';
@@ -9,7 +9,7 @@ import { criminalCodeData, formatCriminalCodeDisplay } from '../data/criminalCod
 import { Prosecutor } from '../api/prosecutors';
 
 interface CaseFormProps {
-  onSubmit: (caseData: CaseFormData, isEditing: boolean) => void;
+  onSubmit: (caseData: CaseFormData, isEditing: boolean, printAfterSave: boolean) => Promise<Case | void>; // Cập nhật prop onSubmit
   prosecutors: Prosecutor[];
   initialData?: Case | null;
   onCancelEdit?: () => void;
@@ -45,6 +45,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [printAfterSave, setPrintAfterSave] = useState<boolean>(false); // State mới cho tùy chọn in
 
   useEffect(() => {
     if (initialData) {
@@ -57,6 +58,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         notes: initialData.notes,
         defendants: initialData.defendants ? initialData.defendants.map(d => ({ ...d })) : []
       });
+      setPrintAfterSave(false); // Reset khi chỉnh sửa
     } else {
       setFormData({
         name: '',
@@ -67,11 +69,12 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         notes: '',
         defendants: []
       });
+      setPrintAfterSave(false); // Reset khi thêm mới
     }
     setErrorMessage(null);
   }, [initialData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -113,7 +116,8 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       }
     }
     
-    onSubmit(finalCaseData, !!initialData);
+    // Gọi onSubmit và truyền thêm printAfterSave
+    const result = await onSubmit(finalCaseData, !!initialData, printAfterSave);
 
     // Reset form chỉ khi ở chế độ thêm mới
     if (!initialData) {
@@ -126,6 +130,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         notes: '',
         defendants: []
       });
+      setPrintAfterSave(false); // Reset tùy chọn in sau khi submit
     }
   };
 
@@ -446,6 +451,23 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
             </div>
           </div>
         </div>
+
+        {/* Thêm tùy chọn in báo cáo sau khi lưu */}
+        {!isEditing && (
+          <div className="flex items-center mt-4">
+            <input
+              type="checkbox"
+              id="printAfterSave"
+              checked={printAfterSave}
+              onChange={(e) => setPrintAfterSave(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="printAfterSave" className="ml-2 block text-sm text-gray-900 flex items-center gap-1">
+              <Printer size={16} />
+              In báo cáo vụ án này sau khi lưu
+            </label>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 mt-6">
           {isEditing && onCancelEdit && (
