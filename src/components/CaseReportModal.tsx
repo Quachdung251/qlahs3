@@ -91,6 +91,13 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
       qrImageInPrintContent.classList.remove('hidden'); // Hiển thị img QR code trong bản in
     }
 
+    // Loại bỏ dòng chú thích QR code trong bản in
+    const qrTextInPrintContent = contentToPrint.querySelector('.qr-code-print-container p');
+    if (qrTextInPrintContent) {
+      qrTextInPrintContent.remove();
+    }
+
+
     printContainer.appendChild(contentToPrint);
     document.body.appendChild(printContainer);
 
@@ -142,6 +149,11 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
         padding: 2px;
         display: block;
         margin: 0 auto;
+      }
+      /* Điều chỉnh khoảng cách cho nội dung chính để tránh bị QR đè */
+      .main-content-area {
+        padding-right: 100px; /* Tạo khoảng trống cho QR code */
+        box-sizing: border-box;
       }
       .info-grid {
         display: grid;
@@ -225,51 +237,54 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
           {/* QR Code cho bản in (mặc định ẩn, chỉ hiển thị khi in) */}
           <div className="qr-code-print-container hidden">
             {qrImageUrl && <img src={qrImageUrl} alt="Mã QR Vụ án" />}
-            <p style={{ fontSize: '8pt', color: '#666', marginTop: '5px' }}>ID Vụ án: {caseItem.id}</p>
+            {/* Dòng chú thích đã được loại bỏ */}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 mb-6 info-grid">
-            <div className="flex items-start info-row">
-              <span className="font-semibold w-32 flex-shrink-0 info-label">TÊN VỤ ÁN:</span>
-              <span className="flex-grow info-value">{caseItem.name}</span>
+          {/* Thêm một div bao bọc nội dung chính để tạo khoảng trống cho QR code */}
+          <div className="main-content-area">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 mb-6 info-grid">
+              <div className="flex items-start info-row">
+                <span className="font-semibold w-32 flex-shrink-0 info-label">TÊN VỤ ÁN:</span>
+                <span className="flex-grow info-value">{caseItem.name}</span>
+              </div>
+              <div className="flex items-start info-row">
+                <span className="font-semibold w-32 flex-shrink-0 info-label">ĐIỀU LUẬT:</span>
+                <span className="flex-grow info-value">{caseItem.charges}</span>
+              </div>
+              <div className="flex items-start info-row">
+                <span className="font-semibold w-32 flex-shrink-0 info-label">HẠN ĐIỀU TRA:</span>
+                <span className="flex-grow info-value">{formatDate(caseItem.investigationDeadline)}</span>
+              </div>
+              <div className="flex items-start info-row">
+                <span className="font-semibold w-32 flex-shrink-0 info-label">KSV:</span>
+                <span className="flex-grow info-value">
+                  {caseItem.prosecutor}
+                  {caseItem.supportingProsecutors && caseItem.supportingProsecutors.length > 0 &&
+                    ` (Hỗ trợ: ${caseItem.supportingProsecutors.join(', ')})`}
+                </span>
+              </div>
+              <div className="flex items-start col-span-full info-row full-width-info">
+                <span className="font-semibold w-32 flex-shrink-0 info-label">GHI CHÚ:</span>
+                <span className="flex-grow info-value">{caseItem.notes || 'Không có'}</span>
+              </div>
             </div>
-            <div className="flex items-start info-row">
-              <span className="font-semibold w-32 flex-shrink-0 info-label">ĐIỀU LUẬT:</span>
-              <span className="flex-grow info-value">{caseItem.charges}</span>
-            </div>
-            <div className="flex items-start info-row">
-              <span className="font-semibold w-32 flex-shrink-0 info-label">HẠN ĐIỀU TRA:</span>
-              <span className="flex-grow info-value">{formatDate(caseItem.investigationDeadline)}</span>
-            </div>
-            <div className="flex items-start info-row">
-              <span className="font-semibold w-32 flex-shrink-0 info-label">KSV:</span>
-              <span className="flex-grow info-value">
-                {caseItem.prosecutor}
-                {caseItem.supportingProsecutors && caseItem.supportingProsecutors.length > 0 &&
-                  ` (Hỗ trợ: ${caseItem.supportingProsecutors.join(', ')})`}
-              </span>
-            </div>
-            <div className="flex items-start col-span-full info-row full-width-info">
-              <span className="font-semibold w-32 flex-shrink-0 info-label">GHI CHÚ:</span>
-              <span className="flex-grow info-value">{caseItem.notes || 'Không có'}</span>
-            </div>
-          </div>
 
-          {caseItem.defendants && caseItem.defendants.length > 0 && (
-            <div className="defendant-section mt-6 pt-4 border-t border-gray-200">
-              <h3 className="text-xl font-semibold mb-4 defendant-header">DANH SÁCH BỊ CAN</h3>
-              {caseItem.defendants.map((defendant, index) => (
-                <div key={defendant.id || index} className="border border-gray-200 rounded-md p-4 mb-4 bg-gray-50 defendant-item">
-                  <p className="mb-2"><span className="font-semibold">Tên:</span> {defendant.name}</p>
-                  <p className="mb-2"><span className="font-semibold">Tội danh:</span> {defendant.charges}</p>
-                  <p className="mb-2"><span className="font-semibold">Biện pháp ngăn chặn:</span> {defendant.preventiveMeasure}</p>
-                  {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
-                    <p><span className="font-semibold">Thời hạn tạm giam:</span> {formatDate(defendant.detentionDeadline)}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+            {caseItem.defendants && caseItem.defendants.length > 0 && (
+              <div className="defendant-section mt-6 pt-4 border-t border-gray-200">
+                <h3 className="text-xl font-semibold mb-4 defendant-header">DANH SÁCH BỊ CAN</h3>
+                {caseItem.defendants.map((defendant, index) => (
+                  <div key={defendant.id || index} className="border border-gray-200 rounded-md p-4 mb-4 bg-gray-50 defendant-item">
+                    <p className="mb-2"><span className="font-semibold">Tên:</span> {defendant.name}</p>
+                    <p className="mb-2"><span className="font-semibold">Tội danh:</span> {defendant.charges}</p>
+                    <p className="mb-2"><span className="font-semibold">Biện pháp ngăn chặn:</span> {defendant.preventiveMeasure}</p>
+                    {defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline && (
+                      <p><span className="font-semibold">Thời hạn tạm giam:</span> {formatDate(defendant.detentionDeadline)}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* QR Code cho hiển thị modal (mặc định hiển thị, ẩn khi in) */}
           <div className="qr-code-container mt-8 flex flex-col items-center no-print">
