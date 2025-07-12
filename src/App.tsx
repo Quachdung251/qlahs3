@@ -22,6 +22,7 @@ import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prep
 import { Case, Report, CaseFormData, ReportFormData } from './types';
 import { getCurrentDate, getDaysRemaining } from './utils/dateUtils';
 import QRCodeScannerModal from './components/QRCodeScannerModal';
+import CaseReportModal from './components/CaseReportModal'; // Import component mới
 
 type SystemType = 'cases' | 'reports';
 
@@ -50,15 +51,17 @@ const App: React.FC = () => {
   const [showQrScannerModal, setShowQrScannerModal] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null); // Thêm state để hiển thị thông báo quét
 
+  // State mới để quản lý modal báo cáo vụ án
+  const [caseToReport, setCaseToReport] = useState<Case | null>(null);
+
   // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
   const handleEditCase = useCallback((caseToEdit: Case) => {
     setEditingCase(caseToEdit);
     setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
     setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
-  }, []); // Không có dependencies vì chỉ set state
+  }, []);
 
   // Hàm xử lý khi quét QR thành công
-  // Hàm này đã có sẵn và sẽ được gọi khi nhận được QR data
   const handleQrScanSuccess = useCallback((qrData: string) => {
     console.log('QR Scan Success! QR Data:', qrData);
     // Giả định QR Data là Case ID
@@ -74,7 +77,7 @@ const App: React.FC = () => {
       setScanMessage(`Không tìm thấy vụ án với ID: ${caseId}. Vui lòng kiểm tra lại.`);
       setTimeout(() => setScanMessage(null), 3000);
     }
-  }, [cases, handleEditCase]); // Thêm cases và handleEditCase vào dependency array
+  }, [cases, handleEditCase]);
 
   // --- BỔ SUNG ĐOẠN CODE NÀY ĐỂ LẮNG NGHE SUPABASE REALTIME ---
   useEffect(() => {
@@ -109,7 +112,7 @@ const App: React.FC = () => {
         supabase.removeChannel(realtimeChannel);
       }
     };
-  }, [isAuthenticated, user, supabase, handleQrScanSuccess]); // Loại bỏ 'cases' và 'handleEditCase' khỏi dependencies của useEffect này để tránh re-subscribe không cần thiết, vì handleQrScanSuccess đã là useCallback và có dependencies của nó.
+  }, [isAuthenticated, user, supabase, handleQrScanSuccess]);
 
 
   // Show loading while initializing or fetching prosecutors
@@ -150,7 +153,6 @@ const App: React.FC = () => {
   const handleUpdateProsecutors = (data: Prosecutor[]) => {
     console.log('Updated prosecutors data in App:', data);
     // useProsecutors hook đã tự cập nhật state và IndexedDB, không cần setProsecutors ở đây
-    // setProsecutors(data); // Dòng này không còn cần thiết
   };
 
   // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một tin báo
@@ -671,8 +673,9 @@ const App: React.FC = () => {
                 onTransferStage={transferStage}
                 onUpdateCase={updateCase}
                 onEditCase={handleEditCase}
-                onToggleImportant={toggleImportant} // THÊM PROP NÀY
+                onToggleImportant={toggleImportant}
                 showWarnings={activeTab === 'expiring'}
+                onViewReport={setCaseToReport} // THÊM PROP MỚI
               />
             </>
           );
@@ -877,6 +880,14 @@ const App: React.FC = () => {
         <div className="fixed top-4 left-1/2 -translate-x-1/2 p-3 bg-blue-100 text-blue-800 rounded-md shadow-lg z-50">
           {scanMessage}
         </div>
+      )}
+
+      {/* Modal Báo cáo Vụ án */}
+      {caseToReport && (
+        <CaseReportModal
+          caseItem={caseToReport}
+          onClose={() => setCaseToReport(null)}
+        />
       )}
     </div>
   );
