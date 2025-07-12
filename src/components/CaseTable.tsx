@@ -1,10 +1,3 @@
-Để xử lý lỗi "TypeError: Cannot read properties of undefined (reading 'split')" khi sắp xếp theo hạn tạm giam, chúng ta cần đảm bảo rằng các hàm xử lý ngày tháng (như `getDaysRemaining` và `isExpiringSoon`) luôn nhận được một giá trị ngày hợp lệ (một chuỗi không rỗng). Lỗi này xảy ra khi `detentionDeadline` có thể là `undefined`, `null` hoặc một chuỗi rỗng `""` nhưng không được kiểm tra đúng cách trước khi sử dụng.
-
-Tôi đã cập nhật file `CaseTable.tsx` của bạn để thêm kiểm tra chặt chẽ hơn cho `detentionDeadline` tại tất cả các vị trí liên quan đến việc tính toán hoặc hiển thị thời hạn tạm giam. Cụ thể, các bộ lọc sẽ được thay đổi để chỉ bao gồm các bị can có `detentionDeadline` là một chuỗi không rỗng.
-
-Dưới đây là mã nguồn `CaseTable.tsx` đã được sửa đổi:
-
-```typescript
 // ./components/CaseTable.tsx
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react';
@@ -618,4 +611,3 @@ const CaseTable: React.FC<CaseTableProps> = ({
 };
 
 export default CaseTable;
-```
