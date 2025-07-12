@@ -1,59 +1,43 @@
-// ./utils/dateUtils.ts
+// Utility functions for date formatting and calculations
+export const formatDate = (date: Date): string => {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+export const parseDate = (dateString: string): Date => {
+  const [day, month, year] = dateString.split('/').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+export const toInputDate = (ddmmyyyy: string): string => {
+  const [day, month, year] = ddmmyyyy.split('/');
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+export const fromInputDate = (inputDate: string): string => {
+  const [year, month, day] = inputDate.split('-');
+  return `${day}/${month}/${year}`;
+};
+
+export const getDaysRemaining = (deadline: string): number => {
+  const today = new Date();
+  const deadlineDate = parseDate(deadline);
+  const diffTime = deadlineDate.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+export const isExpiringSoon = (deadline: string): boolean => {
+  return getDaysRemaining(deadline) <= 15;
+};
+
 export const getCurrentDate = (): string => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatDate(new Date());
 };
 
-export const getDaysRemaining = (targetDateString: string): number => {
-  const targetDate = new Date(targetDateString);
-  const today = new Date();
-  // Set time to 00:00:00 for accurate day difference calculation
-  targetDate.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
-
-  const differenceMs = targetDate.getTime() - today.getTime();
-  const differenceDays = Math.ceil(differenceMs / (1000 * 60 * 60 * 24));
-  return differenceDays;
-};
-
-export const isExpiringSoon = (targetDateString: string, daysThreshold: number = 30): boolean => {
-  const remaining = getDaysRemaining(targetDateString);
-  return remaining <= daysThreshold && remaining >= 0; // Expires within threshold or on the day itself
-};
-
-export const formatDisplayDate = (dateString: string | null | undefined): string => {
-  if (!dateString) return 'N/A';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return 'Ngày không hợp lệ';
-    }
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  } catch (e) {
-    console.error("Error formatting date:", dateString, e);
-    return 'Ngày không hợp lệ';
-  }
-};
-
-export const parseDateForInput = (dateString: string | null | undefined): string => {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return ''; // Return empty string for invalid dates
-    }
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  } catch (e) {
-    console.error("Error parsing date for input:", dateString, e);
-    return '';
-  }
+export const addDaysToDate = (dateString: string, days: number): string => {
+  const date = parseDate(dateString);
+  date.setDate(date.getDate() + days);
+  return formatDate(date);
 };
