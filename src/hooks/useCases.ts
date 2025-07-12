@@ -1,8 +1,9 @@
 // ./hooks/useCases.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Case, CaseFormData } from '../types';
 import { getCurrentDate } from '../utils/dateUtils';
 import { dbManager } from '../utils/indexedDB';
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for unique IDs
 
 // Hàm helper để tính số ngày còn lại (để tránh lặp lại code)
 const getDaysRemaining = (dateString: string): number => {
@@ -103,61 +104,108 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     return () => clearTimeout(handler); // Cleanup timeout on unmount or re-render
   }, [cases, userKey, isLoading, isDBInitialized]);
 
-  const addCase = (caseData: CaseFormData) => {
+  const addCase = useCallback(async (caseData: CaseFormData): Promise<Case> => {
+    if (!isDBInitialized) {
+      throw new Error("Database not initialized.");
+    }
     const newCase: Case = {
-      id: Date.now().toString(), // Đảm bảo ID là duy nhất
+      id: uuidv4(), // Sử dụng uuidv4 để đảm bảo ID là duy nhất
       ...caseData,
       stage: 'Điều tra',
       defendants: caseData.defendants.map(defendant => ({
         ...defendant,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9) // ID duy nhất cho bị can
+        id: uuidv4() // ID duy nhất cho bị can
       })),
       createdAt: getCurrentDate(),
-      isImportant: false // THÊM DÒNG NÀY: Mặc định là không quan trọng
+      isImportant: false // Mặc định là không quan trọng
     };
-    setCases(prev => sortCases([...prev, newCase])); // Sắp xếp lại sau khi thêm
-  };
 
-  const updateCase = (updatedCase: Case) => {
-    setCases(prev => sortCases(prev.map(c => c.id === updatedCase.id ? updatedCase : c))); // Sắp xếp lại sau khi cập nhật
-  };
+    try {
+      await dbManager.addData('cases', newCase); // Sử dụng addData để thêm mới
+      setCases(prev => sortCases([...prev, newCase])); // Sắp xếp lại sau khi thêm
+      return newCase; // TRẢ VỀ ĐỐI TƯỢNG VỤ ÁN ĐÃ THÊM
+    } catch (error: any) {
+      console.error("Error adding case to IndexedDB:", error);
+      throw new Error(`Failed to add case: ${error.message || 'Unknown error'}`);
+    }
+  }, [isDBInitialized]); // Thêm isDBInitialized vào dependencies
 
-  const deleteCase = (caseId: string) => {
-    setCases(prev => sortCases(prev.filter(c => c.id !== caseId))); // Sắp xếp lại sau khi xóa
-  };
+  const updateCase = useCallback(async (updatedCase: Case): Promise<Case> => {
+    if (!isDBInitialized) {
+      throw new Error("Database not initialized.");
+    }
+    try {
+      await dbManager.updateData('cases', updatedCase.id, updatedCase); // Sử dụng updateData để cập nhật
+      setCases(prev => sortCases(prev.map(c => c.id === updatedCase.id ? updatedCase : c))); // Sắp xếp lại sau khi cập nhật
+      return updatedCase; // TRẢ VỀ ĐỐI TƯỢNG VỤ ÁN ĐÃ CẬP NHẬT
+    } catch (error: any) {
+      console.error("Error updating case in IndexedDB:", error);
+      throw new Error(`Failed to update case: ${error.message || 'Unknown error'}`);
+    }
+  }, [isDBInitialized]); // Thêm isDBInitialized vào dependencies
 
-  const transferStage = (caseId: string, newStage: Case['stage']) => {
-    setCases(prev => sortCases(prev.map(c => { // Sắp xếp lại sau khi chuyển giai đoạn
-      if (c.id === caseId) {
-        const updated = { ...c, stage: newStage };
+  const deleteCase = useCallback(async (caseId: string) => {
+    if (!isDBInitialized) {
+      throw new Error("Database not initialized.");
+    }
+    try {
+      await dbManager.deleteData('cases', caseId); // Sử dụng deleteData
+      setCases(prev => sortCases(prev.filter(c => c.id !== caseId))); // Sắp xếp lại sau khi xóa
+    } catch (error: any) {
+      console.error("Error deleting case from IndexedDB:", error);
+      throw new Error(`Failed to delete case: ${error.message || 'Unknown error'}`);
+    }
+  }, [isDBInitialized]);
 
-        // Auto-update transfer dates
-        if (newStage === 'Truy tố' && !c.prosecutionTransferDate) {
-          updated.prosecutionTransferDate = getCurrentDate();
-        } else if (newStage === 'Xét xử' && !c.trialTransferDate) {
-          updated.trialTransferDate = getCurrentDate();
-        }
-
-        return updated;
+  const transferStage = useCallback(async (caseId: string, newStage: Case['stage']) => {
+    if (!isDBInitialized) {
+      throw new Error("Database not initialized.");
+    }
+    try {
+      const caseToUpdate = cases.find(c => c.id === caseId);
+      if (!caseToUpdate) {
+        throw new Error("Case not found for stage transfer.");
       }
-      return c;
-    })));
-  };
+      const updated = { ...caseToUpdate, stage: newStage };
 
-  // THÊM DÒNG NÀY: Hàm để bật/tắt trạng thái quan trọng
-  const toggleImportant = (caseId: string) => {
-    setCases(prev => sortCases(prev.map(c =>
-      c.id === caseId ? { ...c, isImportant: !c.isImportant } : c
-    )));
-  };
+      // Auto-update transfer dates
+      if (newStage === 'Truy tố' && !caseToUpdate.prosecutionTransferDate) {
+        updated.prosecutionTransferDate = getCurrentDate();
+      } else if (newStage === 'Xét xử' && !caseToUpdate.trialTransferDate) {
+        updated.trialTransferDate = getCurrentDate();
+      }
 
+      await dbManager.updateData('cases', updated.id, updated);
+      setCases(prev => sortCases(prev.map(c => c.id === updated.id ? updated : c)));
+    } catch (error: any) {
+      console.error("Error transferring case stage in IndexedDB:", error);
+      throw new Error(`Failed to transfer stage: ${error.message || 'Unknown error'}`);
+    }
+  }, [cases, isDBInitialized]);
 
-  const getCasesByStage = (stage: Case['stage']) => {
-    // Luôn trả về dữ liệu đã được sắp xếp
+  const toggleImportant = useCallback(async (caseId: string) => {
+    if (!isDBInitialized) {
+      throw new Error("Database not initialized.");
+    }
+    try {
+      const caseToUpdate = cases.find(c => c.id === caseId);
+      if (!caseToUpdate) {
+        throw new Error("Case not found for toggling importance.");
+      }
+      const updated = { ...caseToUpdate, isImportant: !caseToUpdate.isImportant };
+      await dbManager.updateData('cases', updated.id, updated);
+      setCases(prev => sortCases(prev.map(c => c.id === updated.id ? updated : c)));
+    } catch (error: any) {
+      console.error("Error toggling important status in IndexedDB:", error);
+      throw new Error(`Failed to toggle importance: ${error.message || 'Unknown error'}`);
+    }
+  }, [cases, isDBInitialized]);
+
+  const getCasesByStage = useCallback((stage: Case['stage']) => {
     return cases.filter(c => c.stage === stage);
-  };
+  }, [cases]);
 
-  const getExpiringSoonCases = () => {
+  const getExpiringSoonCases = useCallback(() => {
     return cases.filter(c => {
       if (c.stage !== 'Điều tra') {
         return false;
@@ -180,30 +228,26 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
         return detentionDiffDays <= 15;
       });
     });
-  };
+  }, [cases]);
 
-  /**
-   * Ghi đè toàn bộ dữ liệu vụ án trong IndexedDB và state.
-   * Được sử dụng khi khôi phục dữ liệu từ Supabase.
-   * @param newCases Mảng các vụ án mới để ghi đè.
-   */
-  const overwriteAllCases = async (newCases: Case[]) => {
+  const overwriteAllCases = useCallback(async (newCases: Case[]) => {
     if (!isDBInitialized) {
       console.warn('IndexedDB chưa được khởi tạo, không thể ghi đè dữ liệu vụ án.');
       return;
     }
-    setIsLoading(true); // Đặt loading để tránh lưu tự động trong quá trình ghi đè
+    setIsLoading(true);
     try {
-      await dbManager.saveData('cases', newCases); // Ghi đè tất cả dữ liệu vụ án
-      setCases(sortCases(newCases)); // Cập nhật state React và sắp xếp
-      localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(newCases)); // Cập nhật localStorage
+      await dbManager.saveData('cases', newCases);
+      setCases(sortCases(newCases));
+      localStorage.setItem(`legalCases_${userKey}`, JSON.stringify(newCases));
       console.log('Đã ghi đè tất cả vụ án từ backup thành công.');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Lỗi khi ghi đè vụ án từ backup:', error);
+      throw new Error(`Failed to overwrite cases: ${error.message || 'Unknown error'}`);
     } finally {
-      setIsLoading(false); // Kết thúc loading
+      setIsLoading(false);
     }
-  };
+  }, [isDBInitialized, userKey]);
 
   return {
     cases,
@@ -211,7 +255,7 @@ export const useCases = (userKey: string, isDBInitialized: boolean) => {
     updateCase,
     deleteCase,
     transferStage,
-    toggleImportant, // THÊM DÒNG NÀY: Trả về hàm toggleImportant
+    toggleImportant,
     getCasesByStage,
     getExpiringSoonCases,
     isLoading,
