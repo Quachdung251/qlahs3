@@ -106,6 +106,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
     // Kiểm tra các trường bắt buộc của vụ án sau khi đã xử lý tự động điền
     if (!finalCaseData.name.trim() || !finalCaseData.charges.trim() || !finalCaseData.investigationDeadline.trim() || !finalCaseData.prosecutor.trim()) {
       setErrorMessage('Vui lòng điền đầy đủ các trường bắt buộc: Tên Vụ Án, Tội danh, Thời hạn Điều tra, và Kiểm sát viên Phụ Trách. (Tên Vụ Án và Tội danh có thể tự động điền nếu điền đủ thông tin bị can đầu tiên và vụ án chưa có tên/tội danh)');
+      console.error("Validation Error: Missing required fields."); // Add console log
       return;
     }
 
@@ -113,16 +114,18 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
     for (const defendant of finalCaseData.defendants) {
       if (defendant.charges.trim() === '' || defendant.charges === 'Chưa xác định') {
         setErrorMessage('Tội danh của tất cả bị can phải được xác định cụ thể. Vui lòng kiểm tra lại thông tin bị can.');
+        console.error("Validation Error: Missing defendant charges."); // Add console log
         return;
       }
     }
     
     try {
-      // Gọi onSubmit và truyền thêm printAfterSave
+      console.log("Attempting to submit case data:", finalCaseData); // Log before onSubmit
       const result = await onSubmit(finalCaseData, !!initialData, printAfterSave);
+      console.log("onSubmit result:", result); // Log onSubmit result
 
-      // Reset form chỉ khi ở chế độ thêm mới và submit thành công
-      if (!initialData && result) { // Kiểm tra result để đảm bảo submit thành công
+      if (!initialData && result) { // Check result for success
+        console.log("Case added successfully, resetting form.");
         setFormData({
           name: '',
           charges: '',
@@ -133,6 +136,11 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
           defendants: []
         });
         setPrintAfterSave(true); // Reset tùy chọn in về mặc định true sau khi submit thành công
+      } else if (initialData && result) {
+        console.log("Case updated successfully.");
+        // No form reset for editing
+      } else {
+        console.warn("onSubmit did not return a valid case object, or was cancelled.");
       }
     } catch (error: any) {
       console.error("Lỗi khi gửi form:", error);
