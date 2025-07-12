@@ -1,6 +1,6 @@
 // ./components/CaseTable.tsx
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer } from 'lucide-react';
 import { Case, Defendant } from '../types';
 import { getDaysRemaining, isExpiringSoon } from '../utils/dateUtils';
 import NotesModal from './NotesModal';
@@ -157,19 +157,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         </button>
       );
     }
-
-    actions.push(
-      <button
-        key="print-qr"
-        onClick={() => handlePrintExistingQR(caseItem)}
-        className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
-        title="In nhãn QR Code"
-      >
-        <Printer size={12} />
-        In QR
-      </button>
-    );
-
     return actions;
   };
 
@@ -242,11 +229,20 @@ const CaseTable: React.FC<CaseTableProps> = ({
         const isExpanded = expandedActions.has(caseItem.id);
 
         return (
-          <div className="relative">
+          <div className="relative flex flex-col items-start gap-1">
+            <button
+              key="print-qr"
+              onClick={() => handlePrintExistingQR(caseItem)}
+              className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
+              title="In nhãn QR Code"
+            >
+              <Printer size={12} />
+              In QR
+            </button>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onEditCase(caseItem)}
-                className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
+                className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors"
               >
                 <Edit2 size={12} />
                 Sửa
@@ -255,10 +251,10 @@ const CaseTable: React.FC<CaseTableProps> = ({
               {caseItem.stage === 'Điều tra' && (
                 <button
                   onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
-                  className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowrap"
+                  className="p-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors"
+                  title="Gia hạn Điều tra"
                 >
-                  <Clock size={12} />
-                  Gia hạn ĐT
+                  <Clock size={16} />
                 </button>
               )}
 
@@ -267,9 +263,9 @@ const CaseTable: React.FC<CaseTableProps> = ({
               {stageActions.length > 1 && (
                 <button
                   onClick={() => toggleActions(caseItem.id)}
-                  className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
+                  className="p-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
                 >
-                  <MoreHorizontal size={12} />
+                  <MoreHorizontal size={16} />
                 </button>
               )}
             </div>
