@@ -18,6 +18,7 @@ export interface Case {
   stage: 'Điều tra' | 'Truy tố' | 'Xét xử' | 'Hoàn thành' | 'Tạm đình chỉ' | 'Đình chỉ' | 'Chuyển đi';
   prosecutionTransferDate?: string; // dd/MM/yyyy format
   trialTransferDate?: string; // dd/MM/yyyy format
+  resolutionForm?: string; // THÊM DÒNG NÀY: Hình thức giải quyết
   defendants: Defendant[];
   createdAt: string;
   isImportant?: boolean; // THÊM DÒNG NÀY: Đánh dấu vụ án quan trọng
