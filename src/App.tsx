@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode } from 'lucide-react';
 import TabNavigation from './components/TabNavigation';
@@ -11,6 +12,9 @@ import ReportTable from './components/ReportTable';
 import ReportStatistics from './components/ReportStatistics';
 import LoginForm from './components/LoginForm';
 import UserManagement from './components/UserManagement';
+import QRCodeScannerModal from './components/QRCodeScannerModal'; // Đảm bảo đã import
+import QRCodeDisplayModal from './components/QRCodeDisplayModal'; // Đảm bảo đã import
+
 import { useCases } from './hooks/useCases';
 import { useReports } from './hooks/useReports';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
@@ -21,7 +25,6 @@ import { useProsecutors } from './hooks/useProsecutors';
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils';
 import { Case, Report, CaseFormData, ReportFormData } from './types';
 import { getCurrentDate, getDaysRemaining } from './utils/dateUtils';
-import QRCodeScannerModal from './components/QRCodeScannerModal';
 
 type SystemType = 'cases' | 'reports';
 
@@ -48,40 +51,46 @@ const App: React.FC = () => {
   const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false);
   const [dataToRestore, setDataToRestore] = useState<{ cases: Case[], reports: Report[] } | null>(null);
   const [showQrScannerModal, setShowQrScannerModal] = useState(false);
-  const [scanMessage, setScanMessage] = useState<string | null>(null); // Thêm state để hiển thị thông báo quét
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [caseToPrintQr, setCaseToPrintQr] = useState<Case | null>(null); // State mới để lưu vụ án cần in QR
 
   // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
   const handleEditCase = useCallback((caseToEdit: Case) => {
     setEditingCase(caseToEdit);
     setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
     setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
-  }, []); // Không có dependencies vì chỉ set state
+  }, []);
 
   // Hàm xử lý khi quét QR thành công
-  // Hàm này đã có sẵn và sẽ được gọi khi nhận được QR data
   const handleQrScanSuccess = useCallback((qrData: string) => {
     console.log('QR Scan Success! QR Data:', qrData);
-    // Giả định QR Data là Case ID
-    const caseId = qrData;
-    const foundCase = cases.find(c => c.id === caseId);
+    // Giả định QR Data là Case ID hoặc JSON chứa ID
+    let foundCase: Case | undefined;
+    try {
+      const parsedQrData = JSON.parse(qrData);
+      if (parsedQrData && parsedQrData.id) {
+        foundCase = cases.find(c => c.id === parsedQrData.id);
+      }
+    } catch (e) {
+      // Nếu không phải JSON, thử coi là ID trực tiếp
+      foundCase = cases.find(c => c.id === qrData);
+    }
 
     if (foundCase) {
       handleEditCase(foundCase); // Mở form chỉnh sửa với dữ liệu vụ án
-      // Optional: hide QR scanner modal if it's open
       setShowQrScannerModal(false);
     } else {
-      console.warn(`Không tìm thấy vụ án với ID: ${caseId}`);
-      setScanMessage(`Không tìm thấy vụ án với ID: ${caseId}. Vui lòng kiểm tra lại.`);
+      setScanMessage(`Không tìm thấy vụ án với dữ liệu QR: ${qrData}. Vui lòng kiểm tra lại.`);
       setTimeout(() => setScanMessage(null), 3000);
     }
-  }, [cases, handleEditCase]); // Thêm cases và handleEditCase vào dependency array
+  }, [cases, handleEditCase]);
 
   // --- BỔ SUNG ĐOẠN CODE NÀY ĐỂ LẮNG NGHE SUPABASE REALTIME ---
   useEffect(() => {
     let realtimeChannel: any = null;
 
     if (isAuthenticated && user && supabase) {
-      const channelName = `qr_scans_channel_${user.id}`; // Phải khớp với tên kênh trong index.html
+      const channelName = `qr_scans_channel_${user.id}`;
       realtimeChannel = supabase.channel(channelName);
 
       realtimeChannel.on(
@@ -90,7 +99,7 @@ const App: React.FC = () => {
         (payload: any) => {
           console.log('Received Realtime scan_event:', payload);
           if (payload.payload && payload.payload.qrData) {
-            handleQrScanSuccess(payload.payload.qrData); // Gọi hàm xử lý QR code
+            handleQrScanSuccess(payload.payload.qrData);
           }
         }
       ).subscribe((status: any) => {
@@ -102,17 +111,15 @@ const App: React.FC = () => {
       });
     }
 
-    // Cleanup function: Hủy đăng ký kênh khi component unmount hoặc user thay đổi
     return () => {
       if (realtimeChannel) {
         console.log(`Hủy đăng ký kênh Realtime: ${realtimeChannel.name}`);
         supabase.removeChannel(realtimeChannel);
       }
     };
-  }, [isAuthenticated, user, supabase, handleQrScanSuccess]); // Loại bỏ 'cases' và 'handleEditCase' khỏi dependencies của useEffect này để tránh re-subscribe không cần thiết, vì handleQrScanSuccess đã là useCallback và có dependencies của nó.
+  }, [isAuthenticated, user, supabase, handleQrScanSuccess]);
 
 
-  // Show loading while initializing or fetching prosecutors
   if (authLoading || !isInitialized || prosecutorsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -124,67 +131,62 @@ const App: React.FC = () => {
     );
   }
 
-  // Show login form if not authenticated
   if (!isAuthenticated) {
     return <LoginForm onLogin={signIn} />;
   }
 
-  // Reset tab when switching systems
   const handleSystemChange = (system: SystemType) => {
     setActiveSystem(system);
     setActiveTab('add');
     setSearchTerm('');
     setSelectedProsecutor('');
-    setEditingCase(null); // Clear editing state when switching systems
-    setEditingReport(null); // Clear editing state when switching systems
-    // Reset ngày thống kê khi chuyển hệ thống
+    setEditingCase(null);
+    setEditingReport(null);
     setStatisticsFromDate(getCurrentDate());
     setStatisticsToDate(getCurrentDate());
   };
 
   const handleUpdateCriminalCode = (data: CriminalCodeItem[]) => {
     console.log('Updated criminal code data:', data);
-    // Không cần setCriminalCodeData ở đây vì DataManagement đã tự cập nhật IndexedDB
   };
 
   const handleUpdateProsecutors = (data: Prosecutor[]) => {
     console.log('Updated prosecutors data in App:', data);
-    // useProsecutors hook đã tự cập nhật state và IndexedDB, không cần setProsecutors ở đây
-    // setProsecutors(data); // Dòng này không còn cần thiết
   };
 
-  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một tin báo
   const handleEditReport = (reportToEdit: Report) => {
     setEditingReport(reportToEdit);
-    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
-    setActiveSystem('reports'); // Đảm bảo hệ thống tin báo đang hoạt động
+    setActiveTab('add');
+    setActiveSystem('reports');
   };
 
-  // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
+  // Cập nhật hàm này để nhận lại vụ án đã thêm/cập nhật
   const handleCaseFormSubmit = async (caseData: CaseFormData, isEditing: boolean) => {
     let resultCase: Case | void;
     if (isEditing && editingCase) {
-      resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant }); // GIỮ isImportant
-      setEditingCase(null); // Xóa trạng thái chỉnh sửa
-      setActiveTab('all'); // Chuyển về tab danh sách
+      resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant });
+      setEditingCase(null);
+      setActiveTab('all');
     } else {
       resultCase = await addCase(caseData);
+      // Nếu thêm mới thành công, set caseToPrintQr để hiển thị modal in QR
+      if (resultCase) {
+        setCaseToPrintQr(resultCase);
+      }
     }
-    return resultCase; // Trả về vụ án đã được thêm/cập nhật
+    return resultCase;
   };
 
-  // Hàm xử lý khi form chỉnh sửa tin báo hoàn tất (lưu hoặc hủy)
   const handleReportFormSubmit = (reportData: ReportFormData, isEditing: boolean) => {
     if (isEditing && editingReport) {
       updateReport({ ...reportData, id: editingReport.id, stage: editingReport.stage, createdAt: editingReport.createdAt });
-      setEditingReport(null); // Xóa trạng thái chỉnh sửa
-      setActiveTab('all'); // Chuyển về tab danh sách
+      setEditingReport(null);
+      setActiveTab('all');
     } else {
       addReport(reportData);
     }
   };
 
-  // Filter cases/reports based on search term and prosecutor
   const filterItems = (itemsToFilter: any[]) => {
     return itemsToFilter.filter(item => {
       const matchesSearch = !searchTerm ||
@@ -202,7 +204,6 @@ const App: React.FC = () => {
     });
   };
 
-  // Case management columns
   const getCaseTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Vụ án' },
@@ -308,7 +309,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Report management columns
   const getReportTableColumns = (tabId: string) => {
     const baseColumns = [
       { key: 'name' as const, label: 'Tên Tin báo' },
@@ -354,7 +354,7 @@ const App: React.FC = () => {
     let data;
     switch (activeTab) {
       case 'all':
-        data = cases; // cases đã được sắp xếp trong useCases
+        data = cases;
         break;
       case 'investigation':
         data = getCasesByStage('Điều tra');
@@ -396,7 +396,6 @@ const App: React.FC = () => {
 
   const expiringSoonCount = activeSystem === 'cases' ? getExpiringSoonCases().length : getExpiringSoonReports().length;
 
-  // Xử lý xuất Excel cho vụ án
   const handleExportCasesToExcel = () => {
     if (activeTab === 'statistics') {
       const { data: dataToExport, columns } = prepareCaseStatisticsForExcel(cases, statisticsFromDate, statisticsToDate);
@@ -408,7 +407,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Xử lý xuất Excel cho tin báo
   const handleExportReportsToExcel = () => {
     if (activeTab === 'statistics') {
       const { data: dataToExport, columns } = prepareReportStatisticsForExcel(reports, statisticsFromDate, statisticsToDate);
@@ -416,11 +414,10 @@ const App: React.FC = () => {
     } else {
       const filteredReports = getReportTableData();
       const { data: dataToExport, columns } = prepareReportDataForExcel(filteredReports);
-      exportToExcel(dataToExport, columns, 'DanhSachTinBao');
+      exportToExcel(dataToExcel, columns, 'DanhSachTinBao');
     }
   };
 
-  // Hàm lưu dữ liệu lên Supabase
   const handleSaveDataToSupabase = async () => {
     const currentUser = user;
     const currentSupabase = supabase;
@@ -457,7 +454,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Hàm khôi phục dữ liệu từ Supabase
   const handleLoadDataFromSupabase = async () => {
     const currentUser = user;
     const currentSupabase = supabase;
@@ -476,7 +472,7 @@ const App: React.FC = () => {
         .eq('user_id', currentUser.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 là lỗi không tìm thấy bản ghi
+      if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
@@ -485,7 +481,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // Lưu dữ liệu vào state tạm thời và hiển thị modal xác nhận
       setDataToRestore(data.data as { cases: Case[], reports: Report[] });
       setShowRestoreConfirmModal(true);
 
@@ -497,10 +492,9 @@ const App: React.FC = () => {
     }
   };
 
-  // Hàm xử lý khi người dùng xác nhận khôi phục
   const confirmRestoreAction = async () => {
-    setShowRestoreConfirmModal(false); // Đóng modal xác nhận
-    setRestoreLoading(true); // Bắt đầu lại trạng thái loading cho khôi phục
+    setShowRestoreConfirmModal(false);
+    setRestoreLoading(true);
     setRestoreMessage(null);
 
     const currentUser = user;
@@ -513,7 +507,6 @@ const App: React.FC = () => {
     }
 
     try {
-      // Ghi đè dữ liệu vào IndexedDB thông qua các hooks
       await overwriteAllCases(dataToRestore.cases);
       await overwriteAllReports(dataToRestore.reports);
       setRestoreMessage('Khôi phục dữ liệu thành công từ Supabase! Dữ liệu đã được cập nhật.');
@@ -522,7 +515,7 @@ const App: React.FC = () => {
       setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
     } finally {
       setRestoreLoading(false);
-      setDataToRestore(null); // Xóa dữ liệu tạm thời
+      setDataToRestore(null);
     }
   };
 
@@ -571,7 +564,7 @@ const App: React.FC = () => {
               currentUserId={user?.id || ''}
             />
           );
-        default: // Tabs khác (all, pending, expiring)
+        default:
           return (
             <>
               <div className="flex justify-end mb-4">
@@ -602,7 +595,7 @@ const App: React.FC = () => {
             </>
           );
       }
-    } else { // activeSystem === 'cases'
+    } else {
       switch (activeTab) {
         case 'add':
           return (
@@ -645,7 +638,7 @@ const App: React.FC = () => {
               currentUserId={user?.id || ''}
             />
           );
-        default: // Tabs khác (all, investigation, prosecution, trial, expiring)
+        default:
           return (
             <>
               <div className="flex justify-end mb-4">
@@ -671,7 +664,7 @@ const App: React.FC = () => {
                 onTransferStage={transferStage}
                 onUpdateCase={updateCase}
                 onEditCase={handleEditCase}
-                onToggleImportant={toggleImportant} // THÊM PROP NÀY
+                onToggleImportant={toggleImportant}
                 showWarnings={activeTab === 'expiring'}
               />
             </>
@@ -682,7 +675,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -692,7 +684,6 @@ const App: React.FC = () => {
                 <h1 className="text-2xl font-bold text-gray-900">Hệ Thống Quản Lý</h1>
               </div>
 
-              {/* System Selector */}
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => handleSystemChange('cases')}
@@ -731,7 +722,6 @@ const App: React.FC = () => {
                 <span>{user?.user_metadata?.username || user?.email}</span>
               </div>
 
-              {/* Nút Quét Hồ Sơ */}
               <button
                 onClick={() => setShowQrScannerModal(true)}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -741,7 +731,6 @@ const App: React.FC = () => {
                 Quét Hồ Sơ
               </button>
 
-              {/* Nút Lưu/Khôi phục dữ liệu Supabase */}
               <button
                 onClick={() => setShowBackupRestoreModal(true)}
                 className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -764,7 +753,6 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <TabNavigation
           activeTab={activeTab}
@@ -774,12 +762,10 @@ const App: React.FC = () => {
         />
       </div>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderMainContent()}
       </main>
 
-      {/* Modal Lưu/Khôi phục dữ liệu */}
       {showBackupRestoreModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -831,7 +817,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Xác nhận Khôi phục */}
       {showRestoreConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
@@ -853,7 +838,7 @@ const App: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setShowRestoreConfirmModal(false);
-                  setDataToRestore(null); // Xóa dữ liệu tạm thời
+                  setDataToRestore(null);
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
               >
@@ -864,7 +849,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Quét QR Code */}
       {showQrScannerModal && (
         <QRCodeScannerModal
           onScanSuccess={handleQrScanSuccess}
@@ -872,11 +856,18 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Thông báo quét QR (hiển thị tạm thời) */}
       {scanMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 p-3 bg-blue-100 text-blue-800 rounded-md shadow-lg z-50">
           {scanMessage}
         </div>
+      )}
+
+      {/* Modal hiển thị QR Code sau khi thêm mới */}
+      {caseToPrintQr && (
+        <QRCodeDisplayModal
+          caseData={caseToPrintQr} // Truyền toàn bộ đối tượng Case
+          onClose={() => setCaseToPrintQr(null)}
+        />
       )}
     </div>
   );
