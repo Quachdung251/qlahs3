@@ -171,6 +171,7 @@ const App: React.FC = () => {
       if (isEditing && editingCase) {
         console.log("Updating existing case...");
         resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant });
+        console.log("Result from updateCase:", resultCase); // Log result from updateCase
         if (!resultCase) { // Explicitly check if updateCase failed to return a case
           throw new Error("Failed to update case.");
         }
@@ -179,6 +180,7 @@ const App: React.FC = () => {
       } else {
         console.log("Adding new case...");
         resultCase = await addCase(caseData);
+        console.log("Result from addCase:", resultCase); // Log result from addCase
         if (!resultCase) { // Explicitly check if addCase failed to return a case
           throw new Error("Failed to add case.");
         }
