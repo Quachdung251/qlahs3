@@ -35,7 +35,7 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
 
           // Tạo Data URL (base64) để nhúng vào bản in
           const dataUrl = await QRCode.toDataURL(qrValue, {
-            width: 100, // Kích thước QR code trong bản in
+            width: 80, // Kích thước QR code trong bản in (nhỏ hơn để vừa A4)
             margin: 2,
             color: {
               dark: '#000000',
@@ -66,22 +66,82 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
   };
 
   const handlePrintReport = () => {
-    if (reportContentRef.current) {
+    if (reportContentRef.current && qrImageUrl) { // Đảm bảo qrImageUrl đã có
       const printWindow = window.open('', '', 'height=800,width=800');
       if (printWindow) {
+        let defendantsHtml = '';
+        if (caseItem.defendants && caseItem.defendants.length > 0) {
+          defendantsHtml += `<div class="defendant-section" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+                                <h3 style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px;">DANH SÁCH BỊ CAN</h3>`;
+          caseItem.defendants.forEach((defendant, index) => {
+            defendantsHtml += `<div style="border: 1px solid #eee; padding: 8px; margin-bottom: 8px; border-radius: 4px; font-size: 0.9em;">
+                                  <p style="margin-bottom: 4px;"><span style="font-weight: bold;">Tên:</span> ${defendant.name}</p>
+                                  <p style="margin-bottom: 4px;"><span style="font-weight: bold;">Tội danh:</span> ${defendant.charges}</p>
+                                  <p style="margin-bottom: 4px;"><span style="font-weight: bold;">Biện pháp ngăn chặn:</span> ${defendant.preventiveMeasure}</p>`;
+            if (defendant.preventiveMeasure === 'Tạm giam' && defendant.detentionDeadline) {
+              defendantsHtml += `<p><span style="font-weight: bold;">Thời hạn tạm giam:</span> ${formatDate(defendant.detentionDeadline)}</p>`;
+            }
+            defendantsHtml += `</div>`;
+          });
+          defendantsHtml += `</div>`;
+        }
+
+
+        const printContent = `
+          <div class="report-container" style="max-width: 190mm; margin: auto; padding: 10mm; border: 1px solid #ccc; box-sizing: border-box; font-size: 0.9em;">
+            <h2 style="font-size: 1.4em; font-weight: bold; text-align: center; margin-bottom: 15px;">THÔNG TIN VỤ ÁN</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; margin-bottom: 15px;">
+              <div style="display: flex; align-items: flex-start;">
+                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">TÊN VỤ ÁN:</span>
+                <span style="flex-grow: 1;">${caseItem.name}</span>
+              </div>
+              <div style="display: flex; align-items: flex-start;">
+                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">ĐIỀU LUẬT:</span>
+                <span style="flex-grow: 1;">${caseItem.charges}</span>
+              </div>
+              <div style="display: flex; align-items: flex-start;">
+                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">HẠN ĐIỀU TRA:</span>
+                <span style="flex-grow: 1;">${formatDate(caseItem.investigationDeadline)}</span>
+              </div>
+              <div style="display: flex; align-items: flex-start;">
+                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">KSV:</span>
+                <span style="flex-grow: 1;">
+                  ${caseItem.prosecutor}
+                  ${caseItem.supportingProsecutors && caseItem.supportingProsecutors.length > 0 ?
+                    ` (Hỗ trợ: ${caseItem.supportingProsecutors.join(', ')})` : ''}
+                </span>
+              </div>
+              <div style="display: flex; align-items: flex-start; grid-column: span 2;">
+                <span style="font-weight: bold; width: 80px; flex-shrink: 0;">GHI CHÚ:</span>
+                <span style="flex-grow: 1;">${caseItem.notes || 'Không có'}</span>
+              </div>
+            </div>
+
+            ${defendantsHtml}
+
+            <div class="qr-code-container" style="text-align: center; margin-top: 20px;">
+              <h3 style="font-size: 1.1em; font-weight: bold; margin-bottom: 5px;">Mã QR Vụ án</h3>
+              <img src="${qrImageUrl}" alt="QR Code Vụ án" style="width: 80px; height: 80px; border: 1px solid #ccc; padding: 2px; display: block; margin: 0 auto;">
+              <p style="font-size: 0.8em; color: #666; margin-top: 5px;">ID Vụ án: ${caseItem.id}</p>
+            </div>
+          </div>
+        `;
+
         printWindow.document.write('<html><head><title>Báo cáo Vụ án</title>');
         printWindow.document.write(`
-          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
           <style>
-            body { font-family: 'Inter', sans-serif; margin: 20px; }
-            .report-container { max-width: 21cm; margin: auto; padding: 1cm; border: 1px solid #ccc; }
-            h2 { font-size: 1.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem; }
-            .info-row { display: flex; margin-bottom: 0.5rem; }
-            .info-label { font-weight: bold; width: 150px; flex-shrink: 0; }
+            body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+            .report-container { width: 210mm; min-height: 297mm; margin: 0; padding: 15mm; box-sizing: border-box; font-size: 10pt; line-height: 1.4; }
+            h2 { font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 15px; }
+            h3 { font-size: 12pt; font-weight: bold; margin-bottom: 10px; }
+            .info-row { display: flex; margin-bottom: 5px; }
+            .info-label { font-weight: bold; width: 100px; flex-shrink: 0; }
             .info-value { flex-grow: 1; }
-            .defendant-section { margin-top: 1.5rem; border-top: 1px dashed #ccc; padding-top: 1rem; }
-            .defendant-item { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
-            .qr-code-container { text-align: center; margin-top: 1.5rem; }
+            .defendant-section { margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px; }
+            .defendant-item { border: 1px solid #eee; padding: 8px; margin-bottom: 8px; border-radius: 4px; }
+            .qr-code-container { text-align: center; margin-top: 20px; }
+            .qr-code-container img { display: block; margin: 0 auto; } /* Center image */
             @media print {
               body { -webkit-print-color-adjust: exact; }
               .no-print { display: none; }
@@ -89,19 +149,18 @@ const CaseReportModal: React.FC<CaseReportModalProps> = ({ caseItem, onClose }) 
           </style>
         `);
         printWindow.document.write('</head><body>');
-        printWindow.document.write('<div class="report-container">');
-        // Ghi nội dung từ ref vào cửa sổ in
-        printWindow.document.write(reportContentRef.current.innerHTML);
-        printWindow.document.write('</div>');
+        printWindow.document.write(printContent); // Ghi nội dung đã tạo vào cửa sổ in
         printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.focus();
-        // Đợi một chút để nội dung được render trước khi in
         setTimeout(() => {
           printWindow.print();
           printWindow.onafterprint = () => printWindow.close();
         }, 500);
       }
+    } else {
+      console.error("Không thể in báo cáo: Mã QR chưa được tạo hoặc nội dung báo cáo không có sẵn.");
+      // Có thể hiển thị một thông báo lỗi cho người dùng ở đây
     }
   };
 
