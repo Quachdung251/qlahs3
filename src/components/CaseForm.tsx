@@ -45,7 +45,8 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [printAfterSave, setPrintAfterSave] = useState<boolean>(false); // State mới cho tùy chọn in
+  // Đặt mặc định printAfterSave là true khi thêm mới, false khi chỉnh sửa
+  const [printAfterSave, setPrintAfterSave] = useState<boolean>(!initialData); 
 
   useEffect(() => {
     if (initialData) {
@@ -69,7 +70,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
         notes: '',
         defendants: []
       });
-      setPrintAfterSave(false); // Reset khi thêm mới
+      setPrintAfterSave(true); // Mặc định là true khi thêm mới
     }
     setErrorMessage(null);
   }, [initialData]);
@@ -116,21 +117,26 @@ const CaseForm: React.FC<CaseFormProps> = ({ onSubmit, prosecutors, initialData,
       }
     }
     
-    // Gọi onSubmit và truyền thêm printAfterSave
-    const result = await onSubmit(finalCaseData, !!initialData, printAfterSave);
+    try {
+      // Gọi onSubmit và truyền thêm printAfterSave
+      const result = await onSubmit(finalCaseData, !!initialData, printAfterSave);
 
-    // Reset form chỉ khi ở chế độ thêm mới
-    if (!initialData) {
-      setFormData({
-        name: '',
-        charges: '',
-        investigationDeadline: getCurrentDate(),
-        prosecutor: '',
-        supportingProsecutors: [],
-        notes: '',
-        defendants: []
-      });
-      setPrintAfterSave(false); // Reset tùy chọn in sau khi submit
+      // Reset form chỉ khi ở chế độ thêm mới và submit thành công
+      if (!initialData && result) { // Kiểm tra result để đảm bảo submit thành công
+        setFormData({
+          name: '',
+          charges: '',
+          investigationDeadline: getCurrentDate(),
+          prosecutor: '',
+          supportingProsecutors: [],
+          notes: '',
+          defendants: []
+        });
+        setPrintAfterSave(true); // Reset tùy chọn in về mặc định true sau khi submit thành công
+      }
+    } catch (error: any) {
+      console.error("Lỗi khi gửi form:", error);
+      setErrorMessage(`Đã xảy ra lỗi khi lưu vụ án: ${error.message || "Vui lòng thử lại."}`);
     }
   };
 
