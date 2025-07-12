@@ -1,279 +1,228 @@
-// IndexedDB utilities for local data storage
+// src/utils/indexedDB.ts
+import { openDB, IDBPDatabase, DBSchema } from 'idb';
+import { Case, Report, CriminalCodeItem, Prosecutor } from '../types'; // Đảm bảo import đúng các kiểu dữ liệu của bạn
 
-export const PROSECUTOR_STORE_NAME = 'prosecutors';
-
-export interface DatabaseSchema {
-  cases: any[];
-  reports: any[];
-  criminalCode: any[];
-  prosecutors: any[];
+// Định nghĩa schema cho IndexedDB
+interface MyDB extends DBSchema {
+  cases: {
+    key: string;
+    value: Case;
+  };
+  reports: {
+    key: string;
+    value: Report;
+  };
+  criminalCode: {
+    key: string; // KeyPath là 'article'
+    value: CriminalCodeItem;
+  };
+  prosecutors: {
+    key: string;
+    value: Prosecutor;
+  };
+  userData: {
+    key: string;
+    value: any; // Giá trị có thể là bất kỳ kiểu dữ liệu nào
+  };
 }
 
+const DB_NAME = 'LegalCaseManagement'; // Giữ nguyên tên DB của bạn
+const DB_VERSION = 2; // Tăng version nếu bạn thay đổi schema (thêm/sửa object store)
+
 class IndexedDBManager {
-  private dbName = 'LegalCaseManagement';
-  private version = 1; // Current version of the database schema
-  private db: IDBDatabase | null = null;
-  private _isInitialized: boolean = false; // Internal flag to track initialization
+  private db: IDBPDatabase<MyDB> | null = null;
+  private _isInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
 
-  /**
-   * Initializes the IndexedDB database.
-   * This method should be called once when the application starts.
-   */
-  async init(): Promise<void> {
-    if (this._isInitialized && this.db) {
-      console.log('IndexedDB already initialized.');
-      return; // Already initialized
+  constructor() {
+    // Khởi tạo DB ngay khi tạo instance
+    this.initializeDB();
+  }
+
+  // Khởi tạo cơ sở dữ liệu
+  private async initializeDB(): Promise<void> {
+    if (this.initializationPromise) {
+      return this.initializationPromise;
     }
 
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.version);
+    this.initializationPromise = new Promise(async (resolve, reject) => {
+      try {
+        console.log('IndexedDBManager: Attempting to open database...');
+        this.db = await openDB<MyDB>(DB_NAME, DB_VERSION, {
+          upgrade(db, oldVersion, newVersion, transaction) {
+            console.log(`IndexedDBManager: Upgrading DB from version ${oldVersion} to ${newVersion}`);
 
-      request.onerror = () => {
-        console.error('IndexedDB init error:', request.error);
-        reject(request.error);
-      };
+            // Tạo/cập nhật object store 'cases'
+            if (!db.objectStoreNames.contains('cases')) {
+              db.createObjectStore('cases', { keyPath: 'id' });
+              console.log('IndexedDBManager: Created object store "cases"');
+            }
 
-      request.onsuccess = () => {
-        this.db = request.result;
-        this._isInitialized = true;
-        console.log('IndexedDB initialized successfully.');
+            // Tạo/cập nhật object store 'reports'
+            if (!db.objectStoreNames.contains('reports')) {
+              db.createObjectStore('reports', { keyPath: 'id' });
+              console.log('IndexedDBManager: Created object store "reports"');
+            }
+
+            // Tạo/cập nhật object store 'criminalCode'
+            if (!db.objectStoreNames.contains('criminalCode')) {
+              // Sử dụng 'article' làm keyPath như trong schema của bạn
+              db.createObjectStore('criminalCode', { keyPath: 'article' });
+              console.log('IndexedDBManager: Created object store "criminalCode" with keyPath "article"');
+            } else if (oldVersion < 2 && db.objectStoreNames.contains('criminalCode')) {
+              // Ví dụ: Nếu criminalCode có keyPath khác ở version cũ và cần thay đổi
+              // Đây là một ví dụ phức tạp hơn, thường cần xóa và tạo lại store
+              // Nếu bạn thay đổi keyPath, bạn cần xử lý di chuyển dữ liệu hoặc xóa store cũ
+              // Đối với trường hợp này, tôi sẽ giữ keyPath là 'article' như bạn đã định nghĩa
+              console.log('IndexedDBManager: "criminalCode" store already exists. No keyPath change needed for upgrade to V2.');
+            }
+
+            // Tạo/cập nhật object store 'prosecutors'
+            if (!db.objectStoreNames.contains('prosecutors')) {
+              db.createObjectStore('prosecutors', { keyPath: 'id' });
+              console.log('IndexedDBManager: Created object store "prosecutors"');
+            }
+
+            // Tạo/cập nhật object store 'userData'
+            if (!db.objectStoreNames.contains('userData')) {
+              db.createObjectStore('userData', { keyPath: 'key' });
+              console.log('IndexedDBManager: Created object store "userData"');
+            }
+          },
+          blocked() {
+            console.warn('IndexedDBManager: Database upgrade is blocked. Close other tabs using this database.');
+            reject(new Error('Database upgrade blocked.'));
+          },
+          blocking() {
+            console.warn('IndexedDBManager: Another tab is blocking database upgrade.');
+          }
+        });
+        this.isInitialized = true;
+        console.log('IndexedDBManager: Database opened and initialized successfully.');
         resolve();
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        console.log(`IndexedDB upgrade from version ${event.oldVersion} to ${event.newVersion}`);
-
-        // Create object stores if they don't exist
-        if (!db.objectStoreNames.contains('cases')) {
-          db.createObjectStore('cases', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('reports')) {
-          db.createObjectStore('reports', { keyPath: 'id' });
-        }
-        // criminalCode uses 'article' as keyPath
-        if (!db.objectStoreNames.contains('criminalCode')) {
-          db.createObjectStore('criminalCode', { keyPath: 'article' });
-        }
-        if (!db.objectStoreNames.contains('prosecutors')) {
-          db.createObjectStore('prosecutors', { keyPath: 'id' });
-        }
-        // userData uses 'key' as keyPath
-        if (!db.objectStoreNames.contains('userData')) {
-          db.createObjectStore('userData', { keyPath: 'key' });
-        }
-        
-        // Example of handling version upgrades:
-        // if (event.oldVersion < 2) {
-        //   // Add new store or modify existing one for version 2
-        //   if (!db.objectStoreNames.contains('newStoreName')) {
-        //     db.createObjectStore('newStoreName', { keyPath: 'id' });
-        //   }
-        // }
-      };
-      
-      request.onblocked = () => {
-        console.warn('IndexedDB upgrade is blocked. Please close other tabs with this application.');
-      };
-    });
-  }
-
-  /**
-   * Checks if the IndexedDB is initialized.
-   * @returns boolean True if initialized, false otherwise.
-   */
-  isInitialized(): boolean {
-    return this._isInitialized;
-  }
-
-  /**
-   * Saves an array of data to a specific object store.
-   * This method clears the store before adding new data.
-   * @param storeName The name of the object store.
-   * @param data An array of data objects to save.
-   */
-  async saveData<T>(storeName: string, data: T[]): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized. Call init() first.');
-
-    const transaction = this.db.transaction([storeName], 'readwrite');
-    const store = transaction.objectStore(storeName);
-
-    // Clear existing data
-    await new Promise<void>((resolve, reject) => {
-      const clearRequest = store.clear();
-      clearRequest.onsuccess = () => resolve();
-      clearRequest.onerror = () => reject(clearRequest.error);
-    });
-
-    // Add new data
-    for (const item of data) {
-      await new Promise<void>((resolve, reject) => {
-        const addRequest = store.add(item);
-        addRequest.onsuccess = () => resolve();
-        addRequest.onerror = () => reject(addRequest.error);
-      });
-    }
-    await new Promise<void>((resolve, reject) => { // Ensure transaction completes
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-
-  /**
-   * Loads all data from a specific object store.
-   * @param storeName The name of the object store.
-   * @returns A Promise that resolves to an array of data objects.
-   */
-  async loadData<T>(storeName: string): Promise<T[]> {
-    if (!this.db) {
-      // Attempt to initialize if not already, but don't block
-      if (!this._isInitialized) {
-        try {
-          await this.init();
-        } catch (e) {
-          console.warn('Could not initialize DB before loading data. Returning empty array.', e);
-          return [];
-        }
-      } else {
-        throw new Error('Database not initialized after attempted init.');
+      } catch (error) {
+        console.error('IndexedDBManager: Failed to open or initialize database:', error);
+        this.isInitialized = false;
+        this.db = null;
+        reject(error);
+      } finally {
+        this.initializationPromise = null; // Reset promise after completion
       }
+    });
+    return this.initializationPromise;
+  }
+
+  // Phương thức để kiểm tra xem DB đã sẵn sàng chưa (public)
+  public async ensureDbReady(): Promise<void> {
+    if (this.isInitialized && this.db) {
+      return;
     }
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([storeName], 'readonly');
-      const store = transaction.objectStore(storeName);
-      const request = store.getAll();
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return;
+    }
+    await this.initializeDB();
   }
 
-  /**
-   * Adds a single item to a specific object store.
-   * @param storeName The name of the object store.
-   * @param data The data object to add.
-   */
-  async add<T>(storeName: string, data: T): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized. Call init() first.');
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([storeName], 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.add(data);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+  // Thêm dữ liệu mới vào một object store
+  public async add<T>(storeName: keyof MyDB, data: T): Promise<T> {
+    await this.ensureDbReady();
+    if (!this.db) throw new Error('Database not ready.');
+
+    console.log(`dbManager: Attempting to add data to ${String(storeName)}:`, data);
+    try {
+      const tx = this.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      await store.add(data);
+      await tx.done; // Đảm bảo transaction hoàn tất
+      console.log(`dbManager: Data successfully added to ${String(storeName)}.`);
+      return data;
+    } catch (error: any) {
+      console.error(`dbManager: Error adding data to ${String(storeName)}:`, error);
+      throw new Error(`IndexedDB Error (add): ${error.message || 'Unknown error'}`);
+    }
   }
 
-  /**
-   * Puts (adds or updates) a single item in a specific object store.
-   * @param storeName The name of the object store.
-   * @param data The data object to put.
-   */
-  async put<T>(storeName: string, data: T): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized. Call init() first.');
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([storeName], 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.put(data);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+  // Cập nhật dữ liệu trong một object store (hoặc thêm nếu chưa tồn tại)
+  public async put<T>(storeName: keyof MyDB, data: T): Promise<T> {
+    await this.ensureDbReady();
+    if (!this.db) throw new Error('Database not ready.');
+
+    console.log(`dbManager: Attempting to put data in ${String(storeName)}:`, data);
+    try {
+      const tx = this.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      await store.put(data); // `put` sẽ thêm nếu không tồn tại, hoặc cập nhật nếu tồn tại
+      await tx.done;
+      console.log(`dbManager: Data successfully put in ${String(storeName)}.`);
+      return data;
+    } catch (error: any) {
+      console.error(`dbManager: Error putting data in ${String(storeName)}:`, error);
+      throw new Error(`IndexedDB Error (put): ${error.message || 'Unknown error'}`);
+    }
   }
 
-  /**
-   * Deletes an item from a specific object store by its key.
-   * @param storeName The name of the object store.
-   * @param key The key of the item to delete.
-   */
-  async delete(storeName: string, key: IDBValidKey): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized. Call init() first.');
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([storeName], 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.delete(key);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+  // Xóa dữ liệu khỏi một object store bằng key
+  public async delete(storeName: keyof MyDB, id: string): Promise<void> {
+    await this.ensureDbReady();
+    if (!this.db) throw new Error('Database not ready.');
+
+    console.log(`dbManager: Attempting to delete data from ${String(storeName)} with ID ${id}.`);
+    try {
+      const tx = this.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      await store.delete(id);
+      await tx.done;
+      console.log(`dbManager: Data successfully deleted from ${String(storeName)}.`);
+    } catch (error: any) {
+      console.error(`dbManager: Error deleting data from ${String(storeName)}:`, error);
+      throw new Error(`IndexedDB Error (delete): ${error.message || 'Unknown error'}`);
+    }
   }
 
-  /**
-   * Clears all data from a specific object store.
-   * @param storeName The name of the object store.
-   */
-  async clear(storeName: string): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized. Call init() first.');
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([storeName], 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.clear();
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+  // Tải tất cả dữ liệu từ một object store
+  public async loadData<T>(storeName: keyof MyDB): Promise<T[]> {
+    await this.ensureDbReady();
+    if (!this.db) throw new Error('Database not ready.');
+
+    console.log(`dbManager: Attempting to load all data from ${String(storeName)}.`);
+    try {
+      const tx = this.db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const data = await store.getAll();
+      await tx.done;
+      console.log(`dbManager: Successfully loaded ${data.length} items from ${String(storeName)}.`);
+      return data as T[];
+    } catch (error: any) {
+      console.error(`dbManager: Error loading data from ${String(storeName)}:`, error);
+      throw new Error(`IndexedDB Error (load): ${error.message || 'Unknown error'}`);
+    }
   }
 
-  /**
-   * Saves user-specific data (e.g., settings) to the 'userData' store.
-   * @param key The key for the user data.
-   * @param data The data to save.
-   */
-  async saveUserData(key: string, data: any): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized. Call init() first.');
+  // Ghi đè toàn bộ dữ liệu trong một object store (ví dụ: khi khôi phục backup)
+  public async saveData<T>(storeName: keyof MyDB, data: T[]): Promise<void> {
+    await this.ensureDbReady();
+    if (!this.db) throw new Error('Database not ready.');
 
-    const transaction = this.db.transaction(['userData'], 'readwrite');
-    const store = transaction.objectStore('userData');
-
-    return new Promise((resolve, reject) => {
-      const request = store.put({ key, data }); // 'put' will add or update
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+    console.log(`dbManager: Attempting to overwrite all data in ${String(storeName)} with ${data.length} items.`);
+    try {
+      const tx = this.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      await store.clear(); // Xóa tất cả dữ liệu cũ
+      for (const item of data) {
+        await store.add(item); // Thêm từng item mới
+      }
+      await tx.done;
+      console.log(`dbManager: Successfully overwrote all data in ${String(storeName)}.`);
+    } catch (error: any) {
+      console.error(`dbManager: Error overwriting data in ${String(storeName)}:`, error);
+      throw new Error(`IndexedDB Error (save/overwrite): ${error.message || 'Unknown error'}`);
+    }
   }
 
-  /**
-   * Loads user-specific data from the 'userData' store.
-   * @param key The key of the user data to load.
-   * @returns A Promise that resolves to the user data.
-   */
-  async loadUserData(key: string): Promise<any> {
-    if (!this.db) throw new Error('Database not initialized. Call init() first.');
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['userData'], 'readonly');
-      const store = transaction.objectStore('userData');
-      const request = store.get(key);
-
-      request.onsuccess = () => resolve(request.result?.data);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  /**
-   * Exports all data from specified stores into a single object.
-   * @returns A Promise that resolves to an object containing all exported data.
-   */
-  async exportAllData(): Promise<DatabaseSchema> {
-    const [cases, reports, criminalCode, prosecutors] = await Promise.all([
-      this.loadData('cases'),
-      this.loadData('reports'),
-      this.loadData('criminalCode'),
-      this.loadData('prosecutors')
-    ]);
-
-    return { cases, reports, criminalCode, prosecutors };
-  }
-
-  /**
-   * Imports data into specified stores, overwriting existing data.
-   * @param data An object containing data for various stores.
-   */
-  async importAllData(data: DatabaseSchema): Promise<void> {
-    await Promise.all([
-      this.saveData('cases', data.cases || []),
-      this.saveData('reports', data.reports || []),
-      this.saveData('criminalCode', data.criminalCode || []),
-      this.saveData('prosecutors', data.prosecutors || [])
-    ]);
+  // Phương thức để kiểm tra xem DB đã sẵn sàng chưa (public)
+  public isInitializedPublic(): boolean {
+    return this.isInitialized;
   }
 }
 
