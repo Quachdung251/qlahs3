@@ -384,7 +384,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
                                     <div>
                                       <span className="font-medium">Hạn tạm giam:</span> <span className="whitespace-normal">{defendant.detentionDeadline}</span>
                                       <span className={`ml-1 ${isExpiringSoon(defendant.detentionDeadline) ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                                        ({getDaysRemaining(defendant.det detentionDeadline)} ngày)
+                                        ({getDaysRemaining(defendant.detentionDeadline)} ngày) {/* Sửa lỗi ở đây */}
                                       </span>
                                     </div>
                                     <button
