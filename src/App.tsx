@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode, Plus, MessageSquare } from 'lucide-react';
+import { Scale, FileText, LogOut, Users, Download, Cloud, Upload, X, QrCode } from 'lucide-react';
 import TabNavigation from './components/TabNavigation';
 import CaseForm from './components/CaseForm';
 import CaseTable from './components/CaseTable';
@@ -16,516 +16,826 @@ import { useReports } from './hooks/useReports';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
 import { useIndexedDB } from './hooks/useIndexedDB';
 import { CriminalCodeItem } from './data/criminalCode';
-import { Prosecutor, useProsecutors } from './hooks/useProsecutors'; // Ensure Prosecutor type is imported
+import { Prosecutor } from './hooks/useProsecutors';
+import { useProsecutors } from './hooks/useProsecutors';
 import { exportToExcel, prepareCaseDataForExcel, prepareReportDataForExcel, prepareCaseStatisticsForExcel, prepareReportStatisticsForExcel } from './utils/excelExportUtils';
-import { Case, Report, CaseFormData, ReportFormData, UserRole, Defendant } from './types'; // Ensure UserRole is imported if used
-import { getCurrentDate, getDaysRemaining, isExpiringSoon } from './utils/dateUtils';
+import { Case, Report, CaseFormData, ReportFormData } from './types';
+import { getCurrentDate, getDaysRemaining } from './utils/dateUtils';
 import QRCodeScannerModal from './components/QRCodeScannerModal';
-import NotesModal from './components/NotesModal'; // Ensure NotesModal is imported
-import ExtensionModal from './components/ExtensionModal'; // Ensure ExtensionModal is imported
-import QRCodeDisplayModal from './components/QRCodeDisplayModal'; // Ensure QRCodeDisplayModal is imported
 
-function App() {
-  const { session, user, signIn, signOut } = useSupabaseAuth();
-  const { cases, addCase, updateCase, deleteCase, transferCaseStage, toggleCaseImportant } = useCases();
-  const { reports, addReport, updateReport, deleteReport } = useReports();
-  const { prosecutors } = useProsecutors();
-  const {
-    saveDataToIndexedDB,
-    loadDataFromIndexedDB,
-    syncDataWithCloud,
-    clearAllIndexedDBData,
-    isSyncing,
-    lastSync,
-    isLoadingIndexedDB,
-    indexedDBError
-  } = useIndexedDB();
+type SystemType = 'cases' | 'reports';
 
-  const [activeTab, setActiveTab] = useState('cases'); // 'cases', 'reports', 'data-management', 'statistics', 'users'
-  const [showCaseForm, setShowCaseForm] = useState(false);
+const App: React.FC = () => {
+  const { user, loading: authLoading, signIn, signOut, isAuthenticated, supabase } = useSupabaseAuth();
+  const { isInitialized } = useIndexedDB();
+  const [activeSystem, setActiveSystem] = useState<SystemType>('cases');
+  const [activeTab, setActiveTab] = useState('add');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProsecutor, setSelectedProsecutor] = useState('');
+  const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
+  const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
   const [editingCase, setEditingCase] = useState<Case | null>(null);
-  const [showReportForm, setShowReportForm] = useState(false);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState('');
-  const [selectedCaseStageFilter, setSelectedCaseStageFilter] = useState('');
-  const [importantCasesOnly, setImportantCasesOnly] = useState(false);
-
-  // States for Modals
-  const [notesCase, setNotesCase] = useState<Case | null>(null);
-  const [extensionModal, setExtensionModal] = useState<{
-    case: Case;
-    type: 'investigation' | 'detention';
-    defendant?: Defendant;
-  } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // For case deletion confirmation
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [qrCaseData, setQrCaseData] = useState<{ qrValue: string; caseName: string } | null>(null);
-  const [showQrScannerModal, setShowQrScannerModal] = useState(false);
-  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, overwriteAllProsecutors } = useProsecutors();
+  const userKey = user?.id || 'default';
+  const { cases, addCase, updateCase, deleteCase, transferStage, toggleImportant, getCasesByStage, getExpiringSoonCases, isLoading: casesLoading, overwriteAllCases } = useCases(userKey, isInitialized);
+  const { reports, addReport, updateReport, deleteReport, transferReportStage, getReportsByStage, getExpiringSoonReports, isLoading: reportsLoading, overwriteAllReports } = useReports(userKey, isInitialized);
+  const [showBackupRestoreModal, setShowBackupRestoreModal] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false);
-  const [dataToRestore, setDataToRestore] = useState<any>(null); // Data fetched from cloud to be restored
+  const [dataToRestore, setDataToRestore] = useState<{ cases: Case[], reports: Report[] } | null>(null);
+  const [showQrScannerModal, setShowQrScannerModal] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null); // Thêm state để hiển thị thông báo quét
 
-  const caseStages = ['Điều tra', 'Truy tố', 'Xét xử', 'Hoàn thành', 'Tạm đình chỉ', 'Đình chỉ', 'Chuyển đi'];
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
+  const handleEditCase = useCallback((caseToEdit: Case) => {
+    setEditingCase(caseToEdit);
+    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
+  }, []); // Không có dependencies vì chỉ set state
 
-  // Effect to load data from IndexedDB on component mount
-  useEffect(() => {
-    loadDataFromIndexedDB();
-  }, [loadDataFromIndexedDB]);
+  // Hàm xử lý khi quét QR thành công
+  // Hàm này đã có sẵn và sẽ được gọi khi nhận được QR data
+  const handleQrScanSuccess = useCallback((qrData: string) => {
+    console.log('QR Scan Success! QR Data:', qrData);
+    // Giả định QR Data là Case ID
+    const caseId = qrData;
+    const foundCase = cases.find(c => c.id === caseId);
 
-  // Filtered Cases
-  const filteredCases = useMemo(() => {
-    let currentCases = cases;
-
-    if (searchQuery) {
-      currentCases = currentCases.filter(caseItem =>
-        caseItem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        caseItem.charges.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        caseItem.prosecutor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        caseItem.defendants.some(d => d.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-    }
-
-    if (selectedProsecutorFilter) {
-      currentCases = currentCases.filter(caseItem =>
-        caseItem.prosecutor === selectedProsecutorFilter ||
-        caseItem.supportingProsecutors?.includes(selectedProsecutorFilter)
-      );
-    }
-
-    if (selectedCaseStageFilter) {
-      currentCases = currentCases.filter(caseItem =>
-        caseItem.stage === selectedCaseStageFilter
-      );
-    }
-
-    if (importantCasesOnly) {
-      currentCases = currentCases.filter(caseItem => caseItem.isImportant);
-    }
-
-    return currentCases;
-  }, [cases, searchQuery, selectedProsecutorFilter, selectedCaseStageFilter, importantCasesOnly]);
-
-  const handleAddCaseClick = () => {
-    setEditingCase(null);
-    setShowCaseForm(true);
-  };
-
-  const handleEditCase = (caseItem: Case) => {
-    setEditingCase(caseItem);
-    setShowCaseForm(true);
-  };
-
-  const handleCaseFormSubmit = (caseData: CaseFormData, isEditing: boolean) => {
-    if (isEditing && editingCase) {
-      updateCase(editingCase.id, caseData);
-    } else {
-      addCase(caseData);
-    }
-    setShowCaseForm(false);
-    setEditingCase(null);
-  };
-
-  const handleCancelCaseEdit = () => {
-    setShowCaseForm(false);
-    setEditingCase(null);
-  };
-
-  const handleAddReportClick = () => {
-    setEditingReport(null);
-    setShowReportForm(true);
-  };
-
-  const handleEditReport = (reportItem: Report) => {
-    setEditingReport(reportItem);
-    setShowReportForm(true);
-  };
-
-  const handleReportFormSubmit = (reportData: ReportFormData, isEditing: boolean) => {
-    if (isEditing && editingReport) {
-      updateReport(editingReport.id, reportData);
-    } else {
-      addReport(reportData);
-    }
-    setShowReportForm(false);
-    setEditingReport(null);
-  };
-
-  const handleCancelReportEdit = () => {
-    setShowReportForm(false);
-    setEditingReport(null);
-  };
-
-  // QR Code Generation for existing case
-  const handlePrintExistingQR = useCallback((caseItem: Case) => {
-    const qrValue = caseItem.id; // Using case ID as the QR value
-    setQrCaseData({ qrValue, caseName: caseItem.name });
-    setShowQrModal(true);
-  }, []);
-
-  // QR Scan Success Handler
-  const handleQrScanSuccess = useCallback((scannedId: string) => {
-    setShowQrScannerModal(false);
-    const foundCase = cases.find(c => c.id === scannedId);
     if (foundCase) {
-      setScanMessage(`Đã tìm thấy vụ án: ${foundCase.name}`);
-      handleEditCase(foundCase); // Mở form chỉnh sửa vụ án được quét
+      handleEditCase(foundCase); // Mở form chỉnh sửa với dữ liệu vụ án
+      // Optional: hide QR scanner modal if it's open
+      setShowQrScannerModal(false);
     } else {
-      setScanMessage('Không tìm thấy vụ án với mã QR này.');
+      console.warn(`Không tìm thấy vụ án với ID: ${caseId}`);
+      setScanMessage(`Không tìm thấy vụ án với ID: ${caseId}. Vui lòng kiểm tra lại.`);
+      setTimeout(() => setScanMessage(null), 3000);
     }
-    setTimeout(() => setScanMessage(null), 3000); // Clear message after 3 seconds
-  }, [cases, handleEditCase]);
+  }, [cases, handleEditCase]); // Thêm cases và handleEditCase vào dependency array
 
-  // Handle data export
-  const handleExportData = async () => {
-    try {
-      await exportToExcel(
-        prepareCaseDataForExcel(cases),
-        prepareReportDataForExcel(reports),
-        prepareCaseStatisticsForExcel(cases),
-        prepareReportStatisticsForExcel(reports),
-        'Dữ liệu quản lý án'
-      );
-      alert('Xuất dữ liệu thành công!');
-    } catch (error) {
-      console.error('Lỗi khi xuất dữ liệu:', error);
-      alert('Có lỗi xảy ra khi xuất dữ liệu.');
-    }
-  };
+  // --- BỔ SUNG ĐOẠN CODE NÀY ĐỂ LẮNG NGHE SUPABASE REALTIME ---
+  useEffect(() => {
+    let realtimeChannel: any = null;
 
-  // Handle Sync with Cloud
-  const handleSyncWithCloud = async () => {
-    if (!user) {
-      alert('Vui lòng đăng nhập để đồng bộ dữ liệu.');
-      return;
-    }
-    await syncDataWithCloud(cases, reports);
-  };
+    if (isAuthenticated && user && supabase) {
+      const channelName = `qr_scans_channel_${user.id}`; // Phải khớp với tên kênh trong index.html
+      realtimeChannel = supabase.channel(channelName);
 
-  // Handle Restore from Cloud (Step 1: Fetch and confirm)
-  const handleRestoreFromCloud = async () => {
-    if (!user) {
-      alert('Vui lòng đăng nhập để khôi phục dữ liệu.');
-      return;
+      realtimeChannel.on(
+        'broadcast',
+        { event: 'scan_event' },
+        (payload: any) => {
+          console.log('Received Realtime scan_event:', payload);
+          if (payload.payload && payload.payload.qrData) {
+            handleQrScanSuccess(payload.payload.qrData); // Gọi hàm xử lý QR code
+          }
+        }
+      ).subscribe((status: any) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`Đã đăng ký kênh Realtime: ${channelName}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`Lỗi đăng ký kênh Realtime: ${channelName}`);
+        }
+      });
     }
-    try {
-      const cloudData = await loadDataFromIndexedDB(true); // Fetch directly from cloud
-      if (cloudData && (cloudData.cases || cloudData.reports)) {
-        setDataToRestore(cloudData);
-        setShowRestoreConfirmModal(true);
-      } else {
-        alert('Không tìm thấy dữ liệu để khôi phục từ Cloud.');
+
+    // Cleanup function: Hủy đăng ký kênh khi component unmount hoặc user thay đổi
+    return () => {
+      if (realtimeChannel) {
+        console.log(`Hủy đăng ký kênh Realtime: ${realtimeChannel.name}`);
+        supabase.removeChannel(realtimeChannel);
       }
-    } catch (error) {
-      console.error('Lỗi khi tải dữ liệu từ Cloud:', error);
-      alert('Có lỗi xảy ra khi tải dữ liệu từ Cloud.');
-    }
-  };
+    };
+  }, [isAuthenticated, user, supabase, handleQrScanSuccess]); // Loại bỏ 'cases' và 'handleEditCase' khỏi dependencies của useEffect này để tránh re-subscribe không cần thiết, vì handleQrScanSuccess đã là useCallback và có dependencies của nó.
 
-  // Handle Restore from Cloud (Step 2: Confirmation and restore)
-  const confirmRestoreAction = async () => {
-    if (dataToRestore) {
-      await clearAllIndexedDBData(); // Clear local first
-      // Assuming loadDataFromIndexedDB with true argument also saves to local after fetching
-      // Or you might need a separate function to explicitly set data locally
-      // For now, let's re-run loadDataFromIndexedDB which fetches and updates local
-      await loadDataFromIndexedDB(true); // This will load from cloud and also update local IndexedDB
-      alert('Khôi phục dữ liệu từ Cloud thành công!');
-      setShowRestoreConfirmModal(false);
-      setDataToRestore(null); // Clear temporary data
-    }
-  };
 
-  if (!session) {
+  // Show loading while initializing or fetching prosecutors
+  if (authLoading || !isInitialized || prosecutorsLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Scale className="text-blue-600 mx-auto mb-4" size={48} />
+          <p className="text-gray-600">Đang khởi tạo hệ thống và tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
     return <LoginForm onLogin={signIn} />;
   }
 
-  // Determine user role for conditional rendering
-  const currentUserRole: UserRole = user?.user_metadata?.role || 'user'; // Default to 'user' if not set
+  // Reset tab when switching systems
+  const handleSystemChange = (system: SystemType) => {
+    setActiveSystem(system);
+    setActiveTab('add');
+    setSearchTerm('');
+    setSelectedProsecutor('');
+    setEditingCase(null); // Clear editing state when switching systems
+    setEditingReport(null); // Clear editing state when switching systems
+    // Reset ngày thống kê khi chuyển hệ thống
+    setStatisticsFromDate(getCurrentDate());
+    setStatisticsToDate(getCurrentDate());
+  };
+
+  const handleUpdateCriminalCode = (data: CriminalCodeItem[]) => {
+    console.log('Updated criminal code data:', data);
+    // Không cần setCriminalCodeData ở đây vì DataManagement đã tự cập nhật IndexedDB
+  };
+
+  const handleUpdateProsecutors = (data: Prosecutor[]) => {
+    console.log('Updated prosecutors data in App:', data);
+    // useProsecutors hook đã tự cập nhật state và IndexedDB, không cần setProsecutors ở đây
+    // setProsecutors(data); // Dòng này không còn cần thiết
+  };
+
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một tin báo
+  const handleEditReport = (reportToEdit: Report) => {
+    setEditingReport(reportToEdit);
+    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setActiveSystem('reports'); // Đảm bảo hệ thống tin báo đang hoạt động
+  };
+
+  // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
+  const handleCaseFormSubmit = async (caseData: CaseFormData, isEditing: boolean) => {
+    let resultCase: Case | void;
+    if (isEditing && editingCase) {
+      resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant }); // GIỮ isImportant
+      setEditingCase(null); // Xóa trạng thái chỉnh sửa
+      setActiveTab('all'); // Chuyển về tab danh sách
+    } else {
+      resultCase = await addCase(caseData);
+    }
+    return resultCase; // Trả về vụ án đã được thêm/cập nhật
+  };
+
+  // Hàm xử lý khi form chỉnh sửa tin báo hoàn tất (lưu hoặc hủy)
+  const handleReportFormSubmit = (reportData: ReportFormData, isEditing: boolean) => {
+    if (isEditing && editingReport) {
+      updateReport({ ...reportData, id: editingReport.id, stage: editingReport.stage, createdAt: editingReport.createdAt });
+      setEditingReport(null); // Xóa trạng thái chỉnh sửa
+      setActiveTab('all'); // Chuyển về tab danh sách
+    } else {
+      addReport(reportData);
+    }
+  };
+
+  // Filter cases/reports based on search term and prosecutor
+  const filterItems = (itemsToFilter: any[]) => {
+    return itemsToFilter.filter(item => {
+      const matchesSearch = !searchTerm ||
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.charges.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.defendants && item.defendants.some((d: any) =>
+          d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          d.charges.toLowerCase().includes(searchTerm.toLowerCase())
+        ));
+
+      const matchesProsecutor = !selectedProsecutor ||
+        item.prosecutor === selectedProsecutor;
+
+      return matchesSearch && matchesProsecutor;
+    });
+  };
+
+  // Case management columns
+  const getCaseTableColumns = (tabId: string) => {
+    const baseColumns = [
+      { key: 'name' as const, label: 'Tên Vụ án' },
+    ];
+
+    switch (tabId) {
+      case 'all':
+        return [
+          ...baseColumns,
+          {
+            key: 'charges' as const,
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
+          { key: 'investigationDeadline' as const, label: 'Thời hạn ĐT' },
+          { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
+          { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'stage' as const, label: 'Giai đoạn' },
+          { key: 'prosecutionTransferDate' as const, label: 'Ngày chuyển TT' },
+          { key: 'trialTransferDate' as const, label: 'Ngày chuyển XX' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      case 'investigation':
+        return [
+          ...baseColumns,
+          {
+            key: 'charges' as const,
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
+          { key: 'investigationDeadline' as const, label: 'Thời hạn ĐT' },
+          { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
+          { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      case 'prosecution':
+        return [
+          ...baseColumns,
+          {
+            key: 'charges' as const,
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
+          { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
+          { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'prosecutionTransferDate' as const, label: 'Ngày chuyển TT' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      case 'trial':
+        return [
+          ...baseColumns,
+          {
+            key: 'charges' as const,
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
+          { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
+          { key: 'shortestDetention' as const, label: 'BP Ngăn chặn ngắn nhất' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'trialTransferDate' as const, label: 'Ngày chuyển XX' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      case 'expiring':
+        return [
+          ...baseColumns,
+          {
+            key: 'charges' as const,
+            label: 'Tội danh (VA)',
+            render: (caseItem: Case) => {
+              const match = caseItem.charges.match(/Điều \d+/);
+              return match ? match[0] : caseItem.charges;
+            }
+          },
+          { key: 'stage' as const, label: 'Giai đoạn' },
+          { key: 'investigationRemaining' as const, label: 'Thời hạn ĐT còn lại' },
+          { key: 'totalDefendants' as const, label: 'Tổng Bị can' },
+          { key: 'shortestDetentionRemaining' as const, label: 'Hạn Tạm giam ngắn nhất' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      default:
+        return baseColumns;
+    }
+  };
+
+  // Report management columns
+  const getReportTableColumns = (tabId: string) => {
+    const baseColumns = [
+      { key: 'name' as const, label: 'Tên Tin báo' },
+    ];
+
+    switch (tabId) {
+      case 'all':
+        return [
+          ...baseColumns,
+          { key: 'charges' as const, label: 'Tội danh' },
+          { key: 'resolutionDeadline' as const, label: 'Hạn giải quyết' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'stage' as const, label: 'Trạng thái' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      case 'pending':
+        return [
+          ...baseColumns,
+          { key: 'charges' as const, label: 'Tội danh' },
+          { key: 'resolutionDeadline' as const, label: 'Hạn giải quyết' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      case 'expiring':
+        return [
+          ...baseColumns,
+          { key: 'charges' as const, label: 'Tội danh' },
+          { key: 'resolutionDeadline' as const, label: 'Hạn giải quyết' },
+          { key: 'prosecutor' as const, label: 'KSV' },
+          { key: 'notes' as const, label: 'Ghi chú' },
+          { key: 'actions' as const, label: 'Hành động' }
+        ];
+      default:
+        return baseColumns;
+    }
+  };
+
+  const getCaseTableData = () => {
+    if (casesLoading) return [];
+
+    let data;
+    switch (activeTab) {
+      case 'all':
+        data = cases; // cases đã được sắp xếp trong useCases
+        break;
+      case 'investigation':
+        data = getCasesByStage('Điều tra');
+        break;
+      case 'prosecution':
+        data = getCasesByStage('Truy tố');
+        break;
+      case 'trial':
+        data = getCasesByStage('Xét xử');
+        break;
+      case 'expiring':
+        data = getExpiringSoonCases();
+        break;
+      default:
+        data = [];
+    }
+    return filterItems(data);
+  };
+
+  const getReportTableData = () => {
+    if (reportsLoading) return [];
+
+    let data;
+    switch (activeTab) {
+      case 'all':
+        data = reports;
+        break;
+      case 'pending':
+        data = getReportsByStage('Đang xử lý');
+        break;
+      case 'expiring':
+        data = getExpiringSoonReports();
+        break;
+      default:
+        data = [];
+    }
+    return filterItems(data);
+  };
+
+  const expiringSoonCount = activeSystem === 'cases' ? getExpiringSoonCases().length : getExpiringSoonReports().length;
+
+  // Xử lý xuất Excel cho vụ án
+  const handleExportCasesToExcel = () => {
+    if (activeTab === 'statistics') {
+      const { data: dataToExport, columns } = prepareCaseStatisticsForExcel(cases, statisticsFromDate, statisticsToDate);
+      exportToExcel(dataToExport, columns, 'ThongKeVuAn');
+    } else {
+      const filteredCases = getCaseTableData();
+      const { data: dataToExport, columns } = prepareCaseDataForExcel(filteredCases, activeTab);
+      exportToExcel(dataToExport, columns, 'DanhSachVuAn');
+    }
+  };
+
+  // Xử lý xuất Excel cho tin báo
+  const handleExportReportsToExcel = () => {
+    if (activeTab === 'statistics') {
+      const { data: dataToExport, columns } = prepareReportStatisticsForExcel(reports, statisticsFromDate, statisticsToDate);
+      exportToExcel(dataToExport, columns, 'ThongKeTinBao');
+    } else {
+      const filteredReports = getReportTableData();
+      const { data: dataToExport, columns } = prepareReportDataForExcel(filteredReports);
+      exportToExcel(dataToExport, columns, 'DanhSachTinBao');
+    }
+  };
+
+  // Hàm lưu dữ liệu lên Supabase
+  const handleSaveDataToSupabase = async () => {
+    const currentUser = user;
+    const currentSupabase = supabase;
+
+    if (!currentUser || !currentSupabase) {
+      setBackupMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
+      return;
+    }
+    setBackupLoading(true);
+    setBackupMessage(null);
+
+    try {
+      const combinedData = {
+        cases: cases,
+        reports: reports,
+      };
+
+      const { error } = await currentSupabase
+        .from('user_backups')
+        .upsert(
+          { user_id: currentUser.id, data: combinedData, created_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+
+      if (error) {
+        throw error;
+      }
+      setBackupMessage('Lưu dữ liệu thành công lên Supabase!');
+    } catch (error: any) {
+      console.error('Lỗi khi lưu dữ liệu lên Supabase:', error.message);
+      setBackupMessage(`Lỗi khi lưu dữ liệu: ${error.message}`);
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // Hàm khôi phục dữ liệu từ Supabase
+  const handleLoadDataFromSupabase = async () => {
+    const currentUser = user;
+    const currentSupabase = supabase;
+
+    if (!currentUser || !currentSupabase) {
+      setRestoreMessage('Lỗi: Người dùng chưa đăng nhập hoặc Supabase chưa sẵn sàng.');
+      return;
+    }
+    setRestoreLoading(true);
+    setRestoreMessage(null);
+
+    try {
+      const { data, error } = await currentSupabase
+        .from('user_backups')
+        .select('data')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 là lỗi không tìm thấy bản ghi
+        throw error;
+      }
+
+      if (!data || !data.data) {
+        setRestoreMessage('Không tìm thấy bản sao lưu nào trên Supabase.');
+        return;
+      }
+
+      // Lưu dữ liệu vào state tạm thời và hiển thị modal xác nhận
+      setDataToRestore(data.data as { cases: Case[], reports: Report[] });
+      setShowRestoreConfirmModal(true);
+
+    } catch (error: any) {
+      console.error('Lỗi khi khôi phục dữ liệu từ Supabase:', error.message);
+      setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  // Hàm xử lý khi người dùng xác nhận khôi phục
+  const confirmRestoreAction = async () => {
+    setShowRestoreConfirmModal(false); // Đóng modal xác nhận
+    setRestoreLoading(true); // Bắt đầu lại trạng thái loading cho khôi phục
+    setRestoreMessage(null);
+
+    const currentUser = user;
+    const currentSupabase = supabase;
+
+    if (!currentUser || !currentSupabase || !dataToRestore) {
+      setRestoreMessage('Lỗi: Dữ liệu hoặc thông tin người dùng không hợp lệ để khôi phục.');
+      setRestoreLoading(false);
+      return;
+    }
+
+    try {
+      // Ghi đè dữ liệu vào IndexedDB thông qua các hooks
+      await overwriteAllCases(dataToRestore.cases);
+      await overwriteAllReports(dataToRestore.reports);
+      setRestoreMessage('Khôi phục dữ liệu thành công từ Supabase! Dữ liệu đã được cập nhật.');
+    } catch (error: any) {
+      console.error('Lỗi khi khôi phục dữ liệu sau xác nhận:', error.message);
+      setRestoreMessage(`Lỗi khi khôi phục dữ liệu: ${error.message}`);
+    } finally {
+      setRestoreLoading(false);
+      setDataToRestore(null); // Xóa dữ liệu tạm thời
+    }
+  };
+
+  const renderMainContent = () => {
+    if (activeSystem === 'reports') {
+      switch (activeTab) {
+        case 'add':
+          return (
+            <ReportForm
+              onSubmit={(data, isEditing) => handleReportFormSubmit(data, isEditing)}
+              onTransferToCase={addCase}
+              prosecutors={prosecutors}
+              initialData={editingReport}
+              onCancelEdit={() => {
+                setEditingReport(null);
+                setActiveTab('all');
+              }}
+            />
+          );
+        case 'statistics':
+          return (
+            <>
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleExportReportsToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Tin Báo
+                </button>
+              </div>
+              <ReportStatistics
+                reports={reports}
+                fromDate={statisticsFromDate}
+                toDate={statisticsToDate}
+                setFromDate={setStatisticsFromDate}
+                setToDate={setStatisticsToDate}
+              />
+            </>
+          );
+        case 'data':
+          return (
+            <DataManagement
+              onUpdateCriminalCode={handleUpdateCriminalCode}
+              onUpdateProsecutors={handleUpdateProsecutors}
+              currentUserId={user?.id || ''}
+            />
+          );
+        default: // Tabs khác (all, pending, expiring)
+          return (
+            <>
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleExportReportsToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Tin Báo
+                </button>
+              </div>
+              <SearchFilter
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                selectedProsecutor={selectedProsecutor}
+                onProsecutorChange={setSelectedProsecutor}
+                prosecutors={prosecutors}
+              />
+              <ReportTable
+                reports={getReportTableData()}
+                columns={getReportTableColumns(activeTab)}
+                onDeleteReport={deleteReport}
+                onTransferStage={transferReportStage}
+                onUpdateReport={updateReport}
+                onTransferToCase={addCase}
+                onEditReport={handleEditReport}
+              />
+            </>
+          );
+      }
+    } else { // activeSystem === 'cases'
+      switch (activeTab) {
+        case 'add':
+          return (
+            <CaseForm
+              onSubmit={(data, isEditing) => handleCaseFormSubmit(data, isEditing)}
+              prosecutors={prosecutors}
+              initialData={editingCase}
+              onCancelEdit={() => {
+                setEditingCase(null);
+                setActiveTab('all');
+              }}
+            />
+          );
+        case 'statistics':
+          return (
+            <>
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleExportCasesToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Vụ Án
+                </button>
+              </div>
+              <Statistics
+                cases={cases}
+                fromDate={statisticsFromDate}
+                toDate={statisticsToDate}
+                setFromDate={setStatisticsFromDate}
+                setToDate={setStatisticsToDate}
+              />
+            </>
+          );
+        case 'data':
+          return (
+            <DataManagement
+              onUpdateCriminalCode={handleUpdateCriminalCode}
+              onUpdateProsecutors={handleUpdateProsecutors}
+              currentUserId={user?.id || ''}
+            />
+          );
+        default: // Tabs khác (all, investigation, prosecution, trial, expiring)
+          return (
+            <>
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleExportCasesToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  <Download size={16} />
+                  Xuất Excel Vụ Án
+                </button>
+              </div>
+              <SearchFilter
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                selectedProsecutor={selectedProsecutor}
+                onProsecutorChange={setSelectedProsecutor}
+                prosecutors={prosecutors}
+              />
+              <CaseTable
+                cases={getCaseTableData()}
+                columns={getCaseTableColumns(activeTab)}
+                onDeleteCase={deleteCase}
+                onTransferStage={transferStage}
+                onUpdateCase={updateCase}
+                onEditCase={handleEditCase}
+                onToggleImportant={toggleImportant} // THÊM PROP NÀY
+                showWarnings={activeTab === 'expiring'}
+              />
+            </>
+          );
+      }
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      <header className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-md p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Scale size={32} className="text-blue-200" />
-          <h1 className="text-3xl font-extrabold tracking-tight">Quản lý Hồ sơ Vụ án</h1>
-          <TabNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUserRole} />
-        </div>
-        <div className="flex items-center gap-4">
-          {user && <span className="text-sm font-medium">Xin chào, {user.email} ({currentUserRole === 'admin' ? 'Quản trị viên' : 'Người dùng'})</span>}
-          <button
-            onClick={signOut}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 rounded-md hover:bg-red-700 transition-colors"
-          >
-            <LogOut size={18} />
-            Đăng xuất
-          </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <Scale className="text-blue-600" size={28} />
+                <h1 className="text-2xl font-bold text-gray-900">Hệ Thống Quản Lý</h1>
+              </div>
+
+              {/* System Selector */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => handleSystemChange('cases')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                    activeSystem === 'cases'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  <Scale size={16} />
+                  Vụ Án
+                </button>
+                <button
+                  onClick={() => handleSystemChange('reports')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                    activeSystem === 'reports'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  <FileText size={16} />
+                  Tin Báo
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-500">
+                {activeSystem === 'cases'
+                  ? `Tổng số vụ án: ${cases.length}`
+                  : `Tổng số tin báo: ${reports.length}`
+                }
+              </div>
+
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>{user?.user_metadata?.username || user?.email}</span>
+              </div>
+
+              {/* Nút Quét Hồ Sơ */}
+              <button
+                onClick={() => setShowQrScannerModal(true)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                title="Quét mã QR hồ sơ"
+              >
+                <QrCode size={16} />
+                Quét Hồ Sơ
+              </button>
+
+              {/* Nút Lưu/Khôi phục dữ liệu Supabase */}
+              <button
+                onClick={() => setShowBackupRestoreModal(true)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                title="Lưu và Khôi phục dữ liệu từ Supabase"
+                disabled={!user || !supabase}
+              >
+                <Cloud size={16} />
+                Cloud
+              </button>
+
+              <button
+                onClick={signOut}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <LogOut size={16} />
+                Đăng xuất
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="flex-grow p-6">
-        {activeTab === 'cases' && (
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Danh Sách Vụ Án</h2>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowQrScannerModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-                >
-                  <QrCode size={18} />
-                  Quét QR Vụ án
-                </button>
-                <button
-                  onClick={handleAddCaseClick}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  <Plus size={18} />
-                  Thêm Vụ Án Mới
-                </button>
-              </div>
-            </div>
+      {/* Navigation */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <TabNavigation
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          expiringSoonCount={expiringSoonCount}
+          systemType={activeSystem}
+        />
+      </div>
 
-            <SearchFilter
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              prosecutors={prosecutors.map(p => p.name)}
-              selectedProsecutor={selectedProsecutorFilter}
-              setSelectedProsecutor={setSelectedProsecutorFilter}
-              caseStages={caseStages}
-              selectedCaseStage={selectedCaseStageFilter}
-              setSelectedCaseStage={setSelectedCaseStageFilter}
-              importantCasesOnly={importantCasesOnly}
-              setImportantCasesOnly={setImportantCasesOnly}
-            />
-
-            {isLoadingIndexedDB ? (
-              <p className="text-center text-gray-600 py-8">Đang tải dữ liệu...</p>
-            ) : indexedDBError ? (
-              <p className="text-center text-red-600 py-8">Lỗi tải dữ liệu: {indexedDBError.message}. Vui lòng thử lại.</p>
-            ) : (
-              <CaseTable
-                cases={filteredCases}
-                columns={[
-                  { key: 'name', label: 'Tên Vụ Án', sortable: true },
-                  { key: 'charges', label: 'Tội Danh', sortable: true },
-                  { key: 'stage', label: 'Giai Đoạn', sortable: true },
-                  { key: 'prosecutor', label: 'KSV Phụ Trách', sortable: true },
-                  {
-                    key: 'investigationDeadline', label: 'Hạn ĐT', sortable: true,
-                    render: (caseItem) => {
-                      const days = getDaysRemaining(caseItem.investigationDeadline);
-                      const isExpiring = isExpiringSoon(caseItem.investigationDeadline);
-                      return (
-                        <span className={`${isExpiring ? 'text-red-600 font-bold' : ''}`}>
-                          {caseItem.investigationDeadline} {days !== null ? `(${days} ngày)` : ''}
-                        </span>
-                      );
-                    }
-                  },
-                  {
-                    key: 'shortestDetention', label: 'TG Ngắn nhất',
-                    render: (caseItem) => {
-                      const detainedDefendants = caseItem.defendants.filter(d => d.preventiveMeasure === 'Tạm giam' && d.detentionDeadline);
-                      if (detainedDefendants.length === 0) return 'N/A';
-                      const shortest = detainedDefendants.reduce((min, d) => {
-                        const minDate = new Date(min.split('/').reverse().join('-'));
-                        const dDate = new Date(d.detentionDeadline!.split('/').reverse().join('-'));
-                        return dDate < minDate ? d.detentionDeadline! : min;
-                      }, detainedDefendants[0].detentionDeadline!);
-                      const days = getDaysRemaining(shortest);
-                      const isExpiring = isExpiringSoon(shortest);
-                      return (
-                        <span className={`${isExpiring ? 'text-red-600 font-bold' : ''}`}>
-                          {shortest} {days !== null ? `(${days} ngày)` : ''}
-                        </span>
-                      );
-                    }
-                  },
-                  { key: 'notes', label: 'Ghi Chú', render: (caseItem) => (
-                      <button
-                        onClick={() => setNotesCase(caseItem)}
-                        className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
-                      >
-                        <MessageSquare size={12} className="inline mr-1" />
-                        Xem/Sửa
-                      </button>
-                    )},
-                  { key: 'isImportant', label: 'Quan trọng', sortable: true },
-                  {
-                    key: 'actions', label: 'Hành động',
-                    render: (caseItem) => (
-                      <div className="flex gap-2">
-                        {/* CaseActions component now handles these */}
-                      </div>
-                    )
-                  }
-                ]}
-                onDeleteCase={(id) => setConfirmDelete(id)}
-                onTransferStage={transferCaseStage}
-                onUpdateCase={updateCase}
-                onEditCase={handleEditCase}
-                onToggleImportant={toggleCaseImportant}
-                showWarnings={true}
-                // Pass the setter for extension modal to CaseTable as well
-                onSetExtensionModal={setExtensionModal}
-                // Pass the QR print handler
-                onHandlePrintExistingQR={handlePrintExistingQR}
-                // Pass setNotesCase to CaseTable
-                onSetNotesCase={setNotesCase}
-              />
-            )}
-
-            {showCaseForm && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
-                <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <CaseForm
-                    onSubmit={handleCaseFormSubmit}
-                    prosecutors={prosecutors}
-                    initialData={editingCase}
-                    onCancelEdit={handleCancelCaseEdit}
-                    onSetExtensionModal={setExtensionModal}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'reports' && (
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Danh Sách Tin Báo</h2>
-              <button
-                onClick={handleAddReportClick}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Plus size={18} />
-                Thêm Tin Báo Mới
-              </button>
-            </div>
-            {isLoadingIndexedDB ? (
-              <p className="text-center text-gray-600 py-8">Đang tải dữ liệu...</p>
-            ) : indexedDBError ? (
-              <p className="text-center text-red-600 py-8">Lỗi tải dữ liệu: {indexedDBError.message}. Vui lòng thử lại.</p>
-            ) : (
-              <ReportTable
-                reports={reports}
-                onEditReport={handleEditReport}
-                onDeleteReport={deleteReport}
-              />
-            )}
-            {showReportForm && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
-                <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <ReportForm
-                    onSubmit={handleReportFormSubmit}
-                    prosecutors={prosecutors}
-                    initialData={editingReport}
-                    onCancelEdit={handleCancelReportEdit}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'statistics' && (
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Thống Kê</h2>
-            <Statistics cases={cases} />
-            <ReportStatistics reports={reports} />
-          </div>
-        )}
-
-        {activeTab === 'data-management' && (
-          <DataManagement
-            onExportData={handleExportData}
-            onSyncWithCloud={handleSyncWithCloud}
-            onRestoreFromCloud={handleRestoreFromCloud}
-            isSyncing={isSyncing}
-            lastSync={lastSync}
-          />
-        )}
-
-        {activeTab === 'users' && currentUserRole === 'admin' && (
-          <UserManagement />
-        )}
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderMainContent()}
       </main>
 
-      {/* Modals */}
-      {notesCase && (
-        <NotesModal
-          caseItem={notesCase}
-          onClose={() => setNotesCase(null)}
-          onSaveNotes={(caseId, notes) => {
-            updateCase(caseId, { notes });
-            setNotesCase(prev => prev ? { ...prev, notes } : null); // Update local state for immediate feedback
-          }}
-        />
-      )}
-
-      {extensionModal && (
-        <ExtensionModal
-          caseItem={extensionModal.case}
-          type={extensionModal.type}
-          defendant={extensionModal.defendant}
-          onClose={() => setExtensionModal(null)}
-          onExtend={(updatedCase) => {
-            updateCase(updatedCase.id, updatedCase); // Cập nhật vụ án trong state `cases` của App
-            setExtensionModal(null); // Đóng modal gia hạn
-            // Nếu form đang mở, bạn có thể muốn cập nhật lại initialData của form
-            if (editingCase && editingCase.id === updatedCase.id) {
-              setEditingCase(updatedCase);
-            }
-          }}
-        />
-      )}
-
-      {/* Confirmation Modal for deletion */}
-      {confirmDelete && (
+      {/* Modal Lưu/Khôi phục dữ liệu */}
+      {showBackupRestoreModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận xóa</h3>
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Lưu & Khôi phục dữ liệu (Supabase)</h3>
             <p className="text-sm text-gray-600 mb-6">
-              Bạn có chắc chắn muốn xóa vụ án này không? Hành động này không thể hoàn tác.
+              Bạn có thể lưu dữ liệu hiện tại lên Supabase hoặc khôi phục dữ liệu đã lưu.
+              Lưu ý: Chỉ có một bản sao lưu duy nhất cho mỗi tài khoản. Khi bạn lưu, bản sao lưu cũ sẽ bị ghi đè.
             </p>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                type="button"
+                onClick={handleSaveDataToSupabase}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                disabled={backupLoading}
               >
-                Hủy
+                {backupLoading ? 'Đang lưu...' : <><Upload size={16} /> Lưu lên Cloud</>}
               </button>
               <button
-                onClick={() => {
-                  deleteCase(confirmDelete);
-                  setConfirmDelete(null);
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                type="button"
+                onClick={handleLoadDataFromSupabase}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                disabled={restoreLoading}
               >
-                Xóa
+                {restoreLoading ? 'Đang khôi phục...' : <><Download size={16} /> Khôi phục từ Cloud</>}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBackupRestoreModal(false);
+                  setBackupMessage(null);
+                  setRestoreMessage(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Đóng
               </button>
             </div>
+            {backupMessage && (
+              <p className={`mt-4 text-sm ${backupMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                {backupMessage}
+              </p>
+            )}
+            {restoreMessage && (
+              <p className={`mt-4 text-sm ${restoreMessage.startsWith('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                {restoreMessage}
+              </p>
+            )}
           </div>
         </div>
       )}
 
-      {/* Modal hiển thị QR Code cho vụ án hiện có */}
-      {showQrModal && qrCaseData && (
-        <QRCodeDisplayModal
-          qrCodeValue={qrCaseData.qrValue}
-          caseName={qrCaseData.caseName}
-          onClose={() => setShowQrModal(false)}
-        />
-      )}
-
-      {/* Confirmation Modal for Restore from Cloud */}
+      {/* Modal Xác nhận Khôi phục */}
       {showRestoreConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2"><Cloud size={20} /> Xác nhận Khôi phục Dữ liệu</h3>
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Xác nhận Khôi phục Dữ liệu</h3>
             <p className="text-sm text-gray-600 mb-6">
               Bạn có chắc chắn muốn khôi phục dữ liệu từ Cloud? Thao tác này sẽ GHI ĐÈ toàn bộ dữ liệu Vụ án và Tin báo hiện có trên thiết bị của bạn bằng dữ liệu từ bản sao lưu.
               Bạn sẽ không thể hoàn tác thao tác này.
@@ -570,6 +880,6 @@ function App() {
       )}
     </div>
   );
-}
+};
 
 export default App;
