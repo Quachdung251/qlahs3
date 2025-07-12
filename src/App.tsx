@@ -23,6 +23,9 @@ import { Case, Report, CaseFormData, ReportFormData } from './types';
 import { getCurrentDate, getDaysRemaining } from './utils/dateUtils';
 import QRCodeScannerModal from './components/QRCodeScannerModal';
 
+// Import CaseDetailModal
+import CaseDetailModal from './components/CaseDetailModal';
+
 type SystemType = 'cases' | 'reports';
 
 const App: React.FC = () => {
@@ -34,7 +37,7 @@ const App: React.FC = () => {
   const [selectedProsecutor, setSelectedProsecutor] = useState('');
   const [statisticsFromDate, setStatisticsFromDate] = useState(getCurrentDate());
   const [statisticsToDate, setStatisticsToDate] = useState(getCurrentDate());
-  const [editingCase, setEditingCase] = useState<Case | null>(null);
+  // const [editingCase, setEditingCase] = useState<Case | null>(null); // Xóa state này
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const { prosecutors, loading: prosecutorsLoading, error: prosecutorsError, overwriteAllProsecutors } = useProsecutors();
   const userKey = user?.id || 'default';
@@ -48,33 +51,35 @@ const App: React.FC = () => {
   const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false);
   const [dataToRestore, setDataToRestore] = useState<{ cases: Case[], reports: Report[] } | null>(null);
   const [showQrScannerModal, setShowQrScannerModal] = useState(false);
-  const [scanMessage, setScanMessage] = useState<string | null>(null); // Thêm state để hiển thị thông báo quét
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
 
-  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án
+  // State mới cho CaseDetailModal
+  const [showCaseDetailModal, setShowCaseDetailModal] = useState(false);
+  const [selectedCaseForDetail, setSelectedCaseForDetail] = useState<Case | null>(null);
+
+  // Hàm xử lý khi người dùng nhấn nút "Sửa" trên một vụ án (hoặc click hàng)
   const handleEditCase = useCallback((caseToEdit: Case) => {
-    setEditingCase(caseToEdit);
-    setActiveTab('add'); // Chuyển sang tab "Thêm" để hiển thị form chỉnh sửa
+    setSelectedCaseForDetail(caseToEdit);
+    setShowCaseDetailModal(true);
     setActiveSystem('cases'); // Đảm bảo hệ thống vụ án đang hoạt động
-  }, []); // Không có dependencies vì chỉ set state
+    // Không cần setActiveTab('add') nữa vì modal sẽ nổi lên trên
+  }, []);
 
   // Hàm xử lý khi quét QR thành công
-  // Hàm này đã có sẵn và sẽ được gọi khi nhận được QR data
   const handleQrScanSuccess = useCallback((qrData: string) => {
     console.log('QR Scan Success! QR Data:', qrData);
-    // Giả định QR Data là Case ID
     const caseId = qrData;
     const foundCase = cases.find(c => c.id === caseId);
 
     if (foundCase) {
-      handleEditCase(foundCase); // Mở form chỉnh sửa với dữ liệu vụ án
-      // Optional: hide QR scanner modal if it's open
+      handleEditCase(foundCase); // Mở modal chi tiết với dữ liệu vụ án
       setShowQrScannerModal(false);
     } else {
       console.warn(`Không tìm thấy vụ án với ID: ${caseId}`);
       setScanMessage(`Không tìm thấy vụ án với ID: ${caseId}. Vui lòng kiểm tra lại.`);
       setTimeout(() => setScanMessage(null), 3000);
     }
-  }, [cases, handleEditCase]); // Thêm cases và handleEditCase vào dependency array
+  }, [cases, handleEditCase]);
 
   // --- BỔ SUNG ĐOẠN CODE NÀY ĐỂ LẮNG NGHE SUPABASE REALTIME ---
   useEffect(() => {
@@ -109,8 +114,7 @@ const App: React.FC = () => {
         supabase.removeChannel(realtimeChannel);
       }
     };
-  }, [isAuthenticated, user, supabase, handleQrScanSuccess]); // Loại bỏ 'cases' và 'handleEditCase' khỏi dependencies của useEffect này để tránh re-subscribe không cần thiết, vì handleQrScanSuccess đã là useCallback và có dependencies của nó.
-
+  }, [isAuthenticated, user, supabase, handleQrScanSuccess]);
 
   // Show loading while initializing or fetching prosecutors
   if (authLoading || !isInitialized || prosecutorsLoading) {
@@ -135,8 +139,10 @@ const App: React.FC = () => {
     setActiveTab('add');
     setSearchTerm('');
     setSelectedProsecutor('');
-    setEditingCase(null); // Clear editing state when switching systems
-    setEditingReport(null); // Clear editing state when switching systems
+    // setEditingCase(null); // Không cần clear editingCase nữa
+    setEditingReport(null);
+    setSelectedCaseForDetail(null); // Clear selected case for modal
+    setShowCaseDetailModal(false); // Ensure modal is closed
     // Reset ngày thống kê khi chuyển hệ thống
     setStatisticsFromDate(getCurrentDate());
     setStatisticsToDate(getCurrentDate());
@@ -161,16 +167,16 @@ const App: React.FC = () => {
   };
 
   // Hàm xử lý khi form chỉnh sửa vụ án hoàn tất (lưu hoặc hủy)
+  // Hàm này chỉ còn dùng cho việc THÊM MỚI vụ án từ CaseForm
   const handleCaseFormSubmit = async (caseData: CaseFormData, isEditing: boolean) => {
     let resultCase: Case | void;
-    if (isEditing && editingCase) {
-      resultCase = await updateCase({ ...caseData, id: editingCase.id, stage: editingCase.stage, createdAt: editingCase.createdAt, isImportant: editingCase.isImportant }); // GIỮ isImportant
-      setEditingCase(null); // Xóa trạng thái chỉnh sửa
-      setActiveTab('all'); // Chuyển về tab danh sách
-    } else {
+    if (isEditing) { // Nếu là chỉnh sửa, thì CaseDetailModal đã xử lý rồi
+      console.warn("CaseForm submit called with isEditing=true. This should be handled by CaseDetailModal.");
+      return;
+    } else { // Chỉ thêm mới
       resultCase = await addCase(caseData);
     }
-    return resultCase; // Trả về vụ án đã được thêm/cập nhật
+    return resultCase;
   };
 
   // Hàm xử lý khi form chỉnh sửa tin báo hoàn tất (lưu hoặc hủy)
@@ -609,9 +615,9 @@ const App: React.FC = () => {
             <CaseForm
               onSubmit={(data, isEditing) => handleCaseFormSubmit(data, isEditing)}
               prosecutors={prosecutors}
-              initialData={editingCase}
+              // initialData={editingCase} // Không cần truyền editingCase nữa
               onCancelEdit={() => {
-                setEditingCase(null);
+                // setEditingCase(null); // Không cần set editingCase nữa
                 setActiveTab('all');
               }}
             />
@@ -670,8 +676,8 @@ const App: React.FC = () => {
                 onDeleteCase={deleteCase}
                 onTransferStage={transferStage}
                 onUpdateCase={updateCase}
-                onEditCase={handleEditCase}
-                onToggleImportant={toggleImportant} // THÊM PROP NÀY
+                onEditCase={handleEditCase} // Truyền hàm handleEditCase đã được sửa đổi
+                onToggleImportant={toggleImportant}
                 showWarnings={activeTab === 'expiring'}
               />
             </>
@@ -877,6 +883,21 @@ const App: React.FC = () => {
         <div className="fixed top-4 left-1/2 -translate-x-1/2 p-3 bg-blue-100 text-blue-800 rounded-md shadow-lg z-50">
           {scanMessage}
         </div>
+      )}
+
+      {/* CaseDetailModal (đặt ở cấp cao nhất của App để nó phủ lên mọi thứ) */}
+      {showCaseDetailModal && selectedCaseForDetail && (
+        <CaseDetailModal
+          caseItem={selectedCaseForDetail}
+          onClose={() => {
+            setShowCaseDetailModal(false);
+            setSelectedCaseForDetail(null);
+          }}
+          onUpdateCase={updateCase}
+          onDeleteCase={deleteCase}
+          onTransferStage={transferStage}
+          onToggleImportant={toggleImportant}
+        />
       )}
     </div>
   );
