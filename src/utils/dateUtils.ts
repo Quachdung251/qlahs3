@@ -1,3 +1,4 @@
+// ./utils/dateUtils.ts
 // Utility functions for date formatting and calculations
 export const formatDate = (date: Date): string => {
   const day = date.getDate().toString().padStart(2, '0');
@@ -29,7 +30,7 @@ export const getDaysRemaining = (deadline: string): number => {
 };
 
 export const isExpiringSoon = (deadline: string): boolean => {
-  return getDaysRemaining(deadline) <= 15;
+  return getDaysRemaining(deadline) <= 15; // Using 15 days as the threshold as per user's provided function
 };
 
 export const getCurrentDate = (): string => {
