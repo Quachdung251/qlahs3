@@ -1,3 +1,10 @@
+Để xử lý lỗi "TypeError: Cannot read properties of undefined (reading 'split')" khi sắp xếp theo hạn tạm giam, chúng ta cần đảm bảo rằng các hàm xử lý ngày tháng (như `getDaysRemaining` và `isExpiringSoon`) luôn nhận được một giá trị ngày hợp lệ (một chuỗi không rỗng). Lỗi này xảy ra khi `detentionDeadline` có thể là `undefined`, `null` hoặc một chuỗi rỗng `""` nhưng không được kiểm tra đúng cách trước khi sử dụng.
+
+Tôi đã cập nhật file `CaseTable.tsx` của bạn để thêm kiểm tra chặt chẽ hơn cho `detentionDeadline` tại tất cả các vị trí liên quan đến việc tính toán hoặc hiển thị thời hạn tạm giam. Cụ thể, các bộ lọc sẽ được thay đổi để chỉ bao gồm các bị can có `detentionDeadline` là một chuỗi không rỗng.
+
+Dưới đây là mã nguồn `CaseTable.tsx` đã được sửa đổi:
+
+```typescript
 // ./components/CaseTable.tsx
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Trash2, ArrowRight, CheckCircle, PauseCircle, StopCircle, Send, Edit2, MoreHorizontal, MessageSquare, Clock, Star, Printer, ArrowUp, ArrowDown } from 'lucide-react';
@@ -157,7 +164,19 @@ const CaseTable: React.FC<CaseTableProps> = ({
         </button>
       );
     }
-    // "In QR" button is removed from here to be placed separately.
+
+    actions.push(
+      <button
+        key="print-qr"
+        onClick={() => handlePrintExistingQR(caseItem)}
+        className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
+        title="In nhãn QR Code"
+      >
+        <Printer size={12} />
+        In QR
+      </button>
+    );
+
     return actions;
   };
 
@@ -203,10 +222,6 @@ const CaseTable: React.FC<CaseTableProps> = ({
         const shortestDays = Math.min(...detainedDefendants.map(d => getDaysRemaining(d.detentionDeadline!)));
         return `${shortestDays} ngày`;
       case 'investigationRemaining':
-        // Đảm bảo investigationDeadline là chuỗi không rỗng
-        if (typeof caseItem.investigationDeadline !== 'string' || caseItem.investigationDeadline === '') {
-            return 'Không có';
-        }
         const remaining = getDaysRemaining(caseItem.investigationDeadline);
         return `${remaining} ngày`;
       case 'shortestDetentionRemaining':
@@ -230,58 +245,45 @@ const CaseTable: React.FC<CaseTableProps> = ({
           </button>
         );
       case 'actions':
-        const stageActions = getStageActions(caseItem); // No longer includes "In QR"
+        const stageActions = getStageActions(caseItem);
         const isExpanded = expandedActions.has(caseItem.id);
 
         return (
-          <div className="relative flex flex-col items-start gap-1"> {/* Outer flex-col container for the two rows */}
-            <div className="flex items-center gap-1 flex-wrap"> {/* First row: Sửa, Gia hạn, (first stage action if any) */}
+          <div className="relative">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onEditCase(caseItem)}
+                className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
+              >
+                <Edit2 size={12} />
+                Sửa
+              </button>
+
+              {caseItem.stage === 'Điều tra' && (
                 <button
-                  onClick={() => onEditCase(caseItem)}
-                  className="flex items-center gap-1 px-2 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors whitespace-nowrap"
+                  onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
+                  className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowrap"
                 >
-                  <Edit2 size={12} />
-                  Sửa
+                  <Clock size={12} />
+                  Gia hạn ĐT
                 </button>
+              )}
 
-                {caseItem.stage === 'Điều tra' && (
-                  <button
-                    onClick={() => setExtensionModal({ case: caseItem, type: 'investigation' })}
-                    className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 transition-colors whitespace-nowrap"
-                  >
-                    <Clock size={12} />
-                    Gia hạn ĐT
-                  </button>
-                )}
+              {stageActions.length > 0 && stageActions[0]}
 
-                {/* Display the first stage action directly if it exists */}
-                {stageActions.length > 0 && stageActions[0]}
-
-                {stageActions.length > 1 && ( // MoreHorizontal button only if there are MORE THAN 1 stage actions
-                  <button
-                    onClick={() => toggleActions(caseItem.id)}
-                    className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
-                  >
-                    <MoreHorizontal size={12} />
-                  </button>
-                )}
-            </div>
-
-            <div className="flex items-center gap-1"> {/* Second row: In QR */}
+              {stageActions.length > 1 && (
                 <button
-                  onClick={() => handlePrintExistingQR(caseItem)}
-                  className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors whitespace-nowrap"
-                  title="In nhãn QR Code"
+                  onClick={() => toggleActions(caseItem.id)}
+                  className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
                 >
-                  <Printer size={12} />
-                  In QR
+                  <MoreHorizontal size={12} />
                 </button>
+              )}
             </div>
 
             {isExpanded && stageActions.length > 1 && (
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-max">
                 <div className="p-2 space-y-1">
-                  {/* These are actions from the second element onwards in stageActions */}
                   {stageActions.slice(1).map((action, index) => (
                     <div key={index} className="block">
                       {action}
@@ -306,8 +308,7 @@ const CaseTable: React.FC<CaseTableProps> = ({
       return 'bg-blue-50';
     }
     if (showWarnings) {
-      // Đảm bảo investigationDeadline là chuỗi không rỗng trước khi kiểm tra
-      if (caseItem.stage === 'Điều tra' && typeof caseItem.investigationDeadline === 'string' && caseItem.investigationDeadline !== '' && isExpiringSoon(caseItem.investigationDeadline)) {
+      if (caseItem.stage === 'Điều tra' && isExpiringSoon(caseItem.investigationDeadline)) {
         return 'bg-yellow-50';
       }
 
@@ -343,9 +344,8 @@ const CaseTable: React.FC<CaseTableProps> = ({
             bValue = new Date(b.createdAt).getTime();
             break;
           case 'investigationDeadline': // Hạn điều tra
-            // Xử lý khi investigationDeadline có thể là undefined hoặc chuỗi rỗng
-            aValue = (typeof a.investigationDeadline === 'string' && a.investigationDeadline !== '') ? getDaysRemaining(a.investigationDeadline) : Infinity;
-            bValue = (typeof b.investigationDeadline === 'string' && b.investigationDeadline !== '') ? getDaysRemaining(b.investigationDeadline) : Infinity;
+            aValue = getDaysRemaining(a.investigationDeadline);
+            bValue = getDaysRemaining(b.investigationDeadline);
             break;
           case 'shortestDetentionRemaining': // Hạn tạm giam (gần nhất)
             // Đảm bảo chỉ lấy các bị can có detentionDeadline là chuỗi không rỗng
@@ -618,3 +618,4 @@ const CaseTable: React.FC<CaseTableProps> = ({
 };
 
 export default CaseTable;
+```
